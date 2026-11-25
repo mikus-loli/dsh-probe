@@ -93,6 +93,15 @@ export function normalizeReport(body, now = Date.now()) {
     load15: num(load[2], 0, 0),
     rxRate: num(network.rxRate, 0, 0),
     txRate: num(network.txRate, 0, 0),
+    totalRx: num(network.totalRx, 0, 0),
+    totalTx: num(network.totalTx, 0, 0),
+    connTcp: Math.round(num(body.conn?.tcp, 0, 0, 1e9)),
+    connUdp: Math.round(num(body.conn?.udp, 0, 0, 1e9)),
+    gpuName: typeof body.gpu?.name === 'string' ? body.gpu.name.slice(0, 96) : '',
+    gpuMemTotal: num(body.gpu?.memTotal, 0, 0),
+    gpuMemUsed: num(body.gpu?.memUsed, 0, 0),
+    gpuUsage: num(body.gpu?.usage, 0, 0, 100),
+    gpuTemp: num(body.gpu?.temp, 0, -50, 200),
     uptime: num(body.uptime, 0, 0),
     hostname: typeof body.hostname === 'string' ? body.hostname.slice(0, 128) : '',
     os: typeof body.os === 'string' ? body.os.slice(0, 128) : '',
@@ -208,6 +217,7 @@ export class MetricsHub {
       state.minute = {
         t: minuteStart, count: 0,
         cpu: 0, mem: 0, disk: 0, load: 0, rx: 0, tx: 0,
+        connTcp: 0, connUdp: 0,
         cpuMax: 0, memMax: 0, diskMax: 0,
       }
     }
@@ -219,6 +229,8 @@ export class MetricsHub {
     bucket.load += sample.load1
     bucket.rx += sample.rxRate
     bucket.tx += sample.txRate
+    bucket.connTcp += sample.connTcp ?? 0
+    bucket.connUdp += sample.connUdp ?? 0
     bucket.cpuMax = Math.max(bucket.cpuMax, sample.cpu)
     bucket.memMax = Math.max(bucket.memMax, sample.memPct)
     bucket.diskMax = Math.max(bucket.diskMax, sample.diskPct)
@@ -238,6 +250,10 @@ export class MetricsHub {
       r: round(bucket.rx / bucket.count, 0),
       x: round(bucket.tx / bucket.count, 0),
       cMax: round(bucket.cpuMax, 1),
+      // Connection counts ride the minute row so the trend chart can show them
+      // without a second file; absent on rows written before this field existed.
+      tc: Math.round(bucket.connTcp / bucket.count),
+      uc: Math.round(bucket.connUdp / bucket.count),
     }
     state.persisted.push(row)
     const cutoff = Date.now() - this.retentionDays * 24 * 60 * MINUTE_MS

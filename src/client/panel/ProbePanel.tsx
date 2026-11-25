@@ -783,6 +783,23 @@ function HostDetail({ api, host, onBack, onEdit, onInstall, onDeleted, onHostCha
           sub={current === null ? undefined : `${load(current.load5 / Math.max(1, current.cores))} / ${load(current.load15 / Math.max(1, current.cores))}`}
         />
         <Tile label={tt('detail.net')} value={`↓ ${rate(current?.rxRate)}`} sub={`↑ ${rate(current?.txRate)}`} />
+        <Tile
+          label={tt('detail.conn')}
+          value={current === null ? '—' : String(current.connTcp)}
+          sub={current === null ? undefined : `${tt('detail.udp')} ${current.connUdp}`}
+        />
+        <Tile
+          label={tt('detail.traffic')}
+          value={`↓ ${bytes(current?.totalRx)}`}
+          sub={`↑ ${bytes(current?.totalTx)}`}
+        />
+        {current !== null && current.gpuName !== '' && (
+          <Tile
+            label={tt('detail.gpu')}
+            value={percent(current.gpuUsage)}
+            sub={`${current.gpuName} · ${bytes(current.gpuMemUsed)} / ${bytes(current.gpuMemTotal)}${Number.isFinite(current.gpuTemp) && current.gpuTemp > 0 ? ` · ${Math.round(current.gpuTemp)}°C` : ''}`}
+          />
+        )}
         <Tile label={tt('detail.uptime')} value={uptime(current?.uptime)} sub={host.lastSeen === 0 ? tt('card.never') : ago(host.lastSeen)} />
         <Tile label={tt('detail.os')} value={current?.os ?? '—'} sub={current === null ? undefined : `${current.arch} · ${current.kernel}`} />
       </div>

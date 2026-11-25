@@ -30,6 +30,17 @@ export interface ProbeSample {
   load15: number
   rxRate: number
   txRate: number
+  /** Cumulative bytes since boot, for traffic accounting. */
+  totalRx: number
+  totalTx: number
+  /** Established TCP sockets and open UDP sockets. */
+  connTcp: number
+  connUdp: number
+  gpuName: string
+  gpuMemTotal: number
+  gpuMemUsed: number
+  gpuUsage: number
+  gpuTemp: number
   uptime: number
   hostname: string
   os: string

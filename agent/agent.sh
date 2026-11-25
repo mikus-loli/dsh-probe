@@ -17,7 +17,7 @@
 
 set -u
 
-VERSION=0.2.1
+VERSION=0.3.0
 
 case "${1:-}" in
   --version|-v)
@@ -51,6 +51,21 @@ clean() {
   tr -d '\n\r"\\' | cut -c1-120
 }
 
+# Read one /etc/os-release field, unquoting the value. Empty when absent.
+os_release_field() {
+  [ -r /etc/os-release ] || return 0
+  sed -n "s/^$1=//p" /etc/os-release 2>/dev/null | head -n 1 \
+    | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+}
+
+# Join a distro name and version id, unless the name already repeats it.
+_os_join() {
+  case "$1" in
+    *"$2"*) printf '%s' "$1" ;;
+    *) printf '%s %s' "$1" "$2" ;;
+  esac
+}
+
 # Sample CPU tick counters: total and idle+io-wait.
 cpu_raw() {
   awk '/^cpu / {
@@ -74,6 +89,31 @@ net_raw() {
     tx=$((tx + t))
   done
   printf '%s %s\n' "$rx" "$tx"
+}
+
+# TCP established + UDP socket counts, the pair Komari reports as "connections".
+conn_raw() {
+  tcp=0
+  udp=0
+  for f in /proc/net/tcp /proc/net/tcp6; do
+    [ -r "$f" ] || continue
+    # Field 4 is the socket state; 01 is ESTABLISHED.
+    n=$(awk 'NR > 1 && $4 == "01"' "$f" 2>/dev/null | wc -l)
+    tcp=$((tcp + n))
+  done
+  for f in /proc/net/udp /proc/net/udp6; do
+    [ -r "$f" ] || continue
+    n=$(awk 'NR > 1' "$f" 2>/dev/null | wc -l)
+    udp=$((udp + n))
+  done
+  printf '%s %s\n' "$tcp" "$udp"
+}
+
+# First GPU summary line, when nvidia-smi is installed. Empty otherwise: most
+# hosts have no GPU, and a missing tool must not fail the report.
+gpu_raw() {
+  command -v nvidia-smi >/dev/null 2>&1 || return 0
+  nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu,temperature.gpu     --format=csv,noheader,nounits 2>/dev/null | head -n 1
 }
 
 # Memory numbers in bytes: total, used, swap total, swap used.
@@ -153,6 +193,12 @@ report() {
   disk_total=${1:-0}
   disk_used=${2:-0}
 
+  set -- $(conn_raw)
+  conn_tcp=${1:-0}
+  conn_udp=${2:-0}
+
+  gpu_line=$(gpu_raw)
+
   set -- $(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null)
   load1=${1:-0}
   load5=${2:-0}
@@ -160,18 +206,41 @@ report() {
 
   uptime=$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)
   hostname=$(hostname 2>/dev/null | clean)
-  os=$(uname -s 2>/dev/null | clean)
+  # Distro name, not just the kernel family: /etc/os-release carries the
+  # human-readable identity (e.g. "Debian GNU/Linux 13 (trixie)"), while
+  # `uname -s` only ever answers "Linux". Falls back through NAME+VERSION_ID
+  # and finally the kernel family for systems without os-release.
+  os=$(os_release_field PRETTY_NAME)
+  if [ -z "$os" ]; then
+    _os_name=$(os_release_field NAME)
+    _os_ver=$(os_release_field VERSION_ID)
+    if [ -n "$_os_name" ] && [ -n "$_os_ver" ]; then os="$(_os_join "$_os_name" "$_os_ver")"
+    elif [ -n "$_os_name" ]; then os=$_os_name
+    fi
+  fi
+  if [ -z "$os" ]; then os=$(uname -s 2>/dev/null | clean); fi
+  os=$(printf '%s' "$os" | clean)
   kernel=$(uname -r 2>/dev/null | clean)
   arch=$(uname -m 2>/dev/null | clean)
   cores=$(cpu_count)
   cpu_model=$(awk -F': ' '/model name/ { print $2; exit }' /proc/cpuinfo 2>/dev/null | clean)
   disk_mount=$(printf '%s' "$DISK" | clean)
 
-  printf '{"v":1,"agentVersion":"%s","hostname":"%s","os":"%s %s","arch":"%s","kernel":"%s","cores":%s,"cpuModel":"%s","uptime":%s,"cpu":%s,"mem":{"total":%s,"used":%s,"swapTotal":%s,"swapUsed":%s},"disk":{"mount":"%s","total":%s,"used":%s},"load":[%s,%s,%s],"net":{"rxRate":%s,"txRate":%s},"reportedAt":%s}' \
-    "$VERSION" "$hostname" "$os" "$kernel" "$arch" "$kernel" "$cores" "$cpu_model" "$uptime" \
+  # GPU is optional: only append the key when nvidia-smi produced a line.
+  gpu_json=''
+  if [ -n "$gpu_line" ]; then
+    gpu_json=$(printf '%s' "$gpu_line" | awk -F', *' '{
+      gsub(/"/, "", $1)
+      printf ",\"gpu\":{\"name\":\"%s\",\"memTotal\":%d,\"memUsed\":%d,\"usage\":%s,\"temp\":%s}", $1, $2 * 1048576, $3 * 1048576, $4, $5
+    }')
+  fi
+
+  printf '{"v":1,"agentVersion":"%s","hostname":"%s","os":"%s","arch":"%s","kernel":"%s","cores":%s,"cpuModel":"%s","uptime":%s,"cpu":%s,"mem":{"total":%s,"used":%s,"swapTotal":%s,"swapUsed":%s},"disk":{"mount":"%s","total":%s,"used":%s},"load":[%s,%s,%s],"net":{"rxRate":%s,"txRate":%s,"totalRx":%s,"totalTx":%s},"conn":{"tcp":%s,"udp":%s}%s,"reportedAt":%s}' \
+    "$VERSION" "$hostname" "$os" "$arch" "$kernel" "$cores" "$cpu_model" "$uptime" \
     "$cpu_pct" "$mem_total" "$mem_used" "$swap_total" "$swap_used" \
     "$disk_mount" "$disk_total" "$disk_used" \
-    "$load1" "$load5" "$load15" "$rx_rate" "$tx_rate" \
+    "$load1" "$load5" "$load15" "$rx_rate" "$tx_rate" "$rx_2" "$tx_2" \
+    "$conn_tcp" "$conn_udp" "$gpu_json" \
     "$(date +%s)000"
 }
 

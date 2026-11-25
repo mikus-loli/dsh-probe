@@ -22,9 +22,34 @@
  */
 
 import { readFileSync, statfsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 
-const VERSION = '0.2.1'
+const VERSION = '0.3.0'
+
+/**
+ * Human-readable distro name from /etc/os-release. `os.type()` only ever says
+ * "Linux"; PRETTY_NAME gives the identity an operator recognises.
+ * @returns the distro name, or the kernel family when os-release is absent.
+ */
+function distroName() {
+  try {
+    const text = readFileSync('/etc/os-release', 'utf8')
+    const field = (key) => {
+      const match = new RegExp(`^${key}=(.*)$`, 'm').exec(text)
+      return match === null ? '' : match[1].trim().replace(/^["']|["']$/g, '')
+    }
+    const pretty = field('PRETTY_NAME')
+    if (pretty !== '') return pretty
+    const name = field('NAME')
+    const versionId = field('VERSION_ID')
+    if (name !== '' && versionId !== '') return name.includes(versionId) ? name : `${name} ${versionId}`
+    if (name !== '') return name
+  } catch {
+    // No os-release: fall through to the kernel family.
+  }
+  return os.type()
+}
 
 /** Parse `--key value` flags and `--flag` switches. */
 function parseArgs(argv) {
@@ -101,6 +126,52 @@ function netCounters() {
   return { rx, tx }
 }
 
+/** TCP established + UDP socket counts, matching the shell agent's definition. */
+function connCounters() {
+  const count = (file, establishedOnly) => {
+    const text = readProc(file)
+    if (text === '') return 0
+    let total = 0
+    const lines = text.split('\n')
+    for (let index = 1; index < lines.length; index += 1) {
+      const line = lines[index].trim()
+      if (line === '') continue
+      if (establishedOnly) {
+        // /proc/net/tcp column 4 holds the socket state; 01 is ESTABLISHED.
+        const fields = line.split(/\s+/)
+        if (fields[3] !== '01') continue
+      }
+      total += 1
+    }
+    return total
+  }
+  return {
+    tcp: count('/proc/net/tcp', true) + count('/proc/net/tcp6', true),
+    udp: count('/proc/net/udp', false) + count('/proc/net/udp6', false),
+  }
+}
+
+/** First GPU summary line from nvidia-smi, or undefined when unavailable. */
+function gpuInfo() {
+  try {
+    const line = execFileSync('nvidia-smi', [
+      '--query-gpu=name,memory.total,memory.used,utilization.gpu,temperature.gpu',
+      '--format=csv,noheader,nounits',
+    ], { encoding: 'utf8', timeout: 3000 }).split('\n')[0]?.trim() ?? ''
+    if (line === '') return undefined
+    const [name = '', memTotal = '0', memUsed = '0', usage = '0', temp = '0'] = line.split(',').map(part => part.trim())
+    return {
+      name,
+      memTotal: Math.round((Number(memTotal) || 0) * 1048576),
+      memUsed: Math.round((Number(memUsed) || 0) * 1048576),
+      usage: Number(usage) || 0,
+      temp: Number(temp) || 0,
+    }
+  } catch {
+    return undefined
+  }
+}
+
 /** Disk usage for one mount. */
 function diskOf(path) {
   try {
@@ -140,12 +211,13 @@ function sample() {
   const mem = memory()
   const disk = diskOf(diskTarget)
   const load = os.loadavg()
+  const gpu = gpuInfo()
   const firstCpu = os.cpus()[0]
   return {
     v: 1,
     agentVersion: VERSION,
     hostname: os.hostname(),
-    os: `${os.type()} ${os.release()}`,
+    os: distroName(),
     arch: os.arch(),
     kernel: os.release(),
     cores,
@@ -155,7 +227,9 @@ function sample() {
     mem: { total: mem.total, used: mem.used, swapTotal: mem.swapTotal, swapUsed: mem.swapUsed },
     disk: { mount: disk.mount, total: disk.total, used: disk.used },
     load: [load[0] ?? 0, load[1] ?? 0, load[2] ?? 0],
-    net: { rxRate: Math.round(rxRate), txRate: Math.round(txRate) },
+    net: { rxRate: Math.round(rxRate), txRate: Math.round(txRate), totalRx: net.rx, totalTx: net.tx },
+    conn: connCounters(),
+    ...(gpu === undefined ? {} : { gpu }),
     reportedAt: now,
   }
 }

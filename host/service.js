@@ -9,6 +9,24 @@
 
 import { normalizeReport } from './metrics.js'
 
+/**
+ * Compare two dotted versions by their numeric segments.
+ * @param {string} a - left version.
+ * @param {string} b - right version.
+ * @returns negative when a < b, 0 when equal, positive when a > b.
+ */
+function compareVersions(a, b) {
+  const split = (value) => String(value).split(/[.+-]/).map((part) => Number.parseInt(part, 10) || 0)
+  const left = split(a)
+  const right = split(b)
+  const length = Math.max(left.length, right.length)
+  for (let index = 0; index < length; index += 1) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
 /** An operation failure carrying the HTTP-ish status the caller should show. */
 export class ProbeError extends Error {
   constructor(message, status = 400) {
@@ -101,9 +119,11 @@ export class ProbeService {
       status,
       muted: (host.mutedUntil ?? 0) > Date.now(),
       mutedUntil: host.mutedUntil ?? 0,
-      // A host whose last report came from an older agent build.
+      // A host whose last report came from an older agent build. Only a
+      // strictly older version is "outdated": an agent upgraded ahead of the
+      // panel is not something the operator needs to act on.
       agentOutdated: current !== null && current.agentVersion !== ''
-        && current.agentVersion !== this.agentVersion,
+        && compareVersions(current.agentVersion, this.agentVersion) < 0,
       lastSeen,
       silenceMs,
       current,
