@@ -3,7 +3,7 @@
 像 Komari 一样的服务器探针，长在 DeepSeek Harness 里：左侧栏多一个「探针」页面，显示每台服务器的实时指标与趋势；智能体也能用同一份数据。
 
 - 仓库：<https://github.com/mikus-loli/dsh-probe>
-- 当前版本：面板 0.2.0 / Agent 0.2.0（两者同版本发布）
+- 当前版本：面板 0.2.1 / Agent 0.2.1（两者同版本发布）
 - 许可：MIT
 
 仓库同时包含**面板端**（`host/` + `src/client/`）与 **agent 端**（`agent/`）：

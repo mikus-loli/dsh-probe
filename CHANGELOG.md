@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The panel and the
 agent scripts are released together; their versions always match
 (`host/version.js`).
 
+## 0.2.1 — 2026-11-25
+
+- Fix: the committed `lib/client.js` is now independent of the checkout path
+  (esbuild used to embed the absolute CSS-module path), so a rebuild on GitHub
+  Actions is byte-identical and the CI bundle check passes.
+
 ## 0.2.0 — 2026-11-25
 
 ### Panel

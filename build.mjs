@@ -70,7 +70,10 @@ const result = await build({
 })
 
 const jsOutput = result.outputFiles.find(file => file.path.endsWith('.js')) ?? result.outputFiles[0]
-const code = jsOutput.text
+// Esbuild annotates plugin-loaded modules with their absolute source path. That
+// would make the committed bundle depend on the checkout directory (and break
+// the CI check that a rebuild is byte-identical), so strip the project root.
+const code = jsOutput.text.split(root).join('.')
 const wrapped = `window.__ModuleLoader__.load({
 	id: ${JSON.stringify(PLUGIN_ID)},
 	factory: (require) => {

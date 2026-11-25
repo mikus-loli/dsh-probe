@@ -24,7 +24,7 @@
 import { readFileSync, statfsSync } from 'node:fs'
 import os from 'node:os'
 
-const VERSION = '0.2.0'
+const VERSION = '0.2.1'
 
 /** Parse `--key value` flags and `--flag` switches. */
 function parseArgs(argv) {
