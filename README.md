@@ -17,6 +17,20 @@ agent:  agent/agent.sh  零运行时 Shell 上报器（推荐）
 shared: test/ 文档  docs/UPGRADING.md  CI  .github/workflows/ci.yml
 ```
 
+## 界面
+
+概览（汇总、搜索筛选、卡片视图）：
+
+![概览](docs/overview.png)
+
+表格视图（可排序，窄屏自动隐藏次要列）：
+
+![表格](docs/table.png)
+
+Webhook 告警通知与测试：
+
+![通知](docs/notify.png)
+
 ## 安装 / 升级
 
 本机开发用 link 安装；也可以直接从 GitHub 装：
