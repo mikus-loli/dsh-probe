@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Probe",
+    "description": "A Komari-style server probe: a lightweight agent on each server reports CPU / memory / disk / load / network; the Probe page shows live cards and 1h-7d trends, alerts when a value stays above its threshold or a host goes silent, and exposes the same data to the agent through probe_* tools."
+  }
+}

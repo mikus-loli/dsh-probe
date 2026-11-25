@@ -1,0 +1,11 @@
+# dsh-probe bundle patch: one package row with two faces.
+#
+# The node half (exports ".") runs in the host process — the probe store, the
+# metric ring buffers and 7-day history, the alert engine, the
+# /api/dsh-probe/* panel routes, the public /auth/dsh-probe/* agent ingest and
+# the probe_* agent tools. The `dsh.client` declaration in package.json makes
+# the browser half (exports "./client") load in the web GUI: the sidebar
+# entry and the Probe panel itself.
+- insert:
+    - id: probe
+      name: '@local/dsh-probe'

@@ -1,0 +1,67 @@
+{
+  "name": "@local/dsh-probe",
+  "description": "Komari-style server probe inside the dsh web GUI: a lightweight Linux agent pushes CPU / memory / disk / load / network metrics, the Probe panel shows live host cards and 1h-7d trends, threshold alerts fire, and the agent can read the same data with probe_* tools.",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "icon": "icon.svg",
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "main": "host/index.js",
+  "exports": {
+    ".": "./host/index.js",
+    "./client": "./lib/client.js",
+    "./locale/en.json": "./locale/en.json",
+    "./locale/zh.json": "./locale/zh.json",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.2-rc.3"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "platform": "web"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.2-rc.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
+  },
+  "files": [
+    "agent",
+    "host",
+    "lib",
+    "src",
+    "cordis.patch.yml",
+    "README.md",
+    "icon.svg",
+    "locale"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikus-loli/dsh-probe.git"
+  },
+  "homepage": "https://github.com/mikus-loli/dsh-probe#readme",
+  "author": "mikus-loli"
+}
