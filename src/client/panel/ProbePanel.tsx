@@ -482,7 +482,6 @@ function HostTable({ hosts, onOpen }: { hosts: ProbeHost[]; onOpen: (id: string)
                   <span className={css.tableName}>{host.name}</span>
                   {host.muted && <span className={css.cardStatus} data-status="muted">{tt('status.muted')}</span>}
                   {host.agentOutdated && <span className={css.cardStatus} data-status="outdated">{tt('host.outdated')}</span>}
-        {host.agentOutdated && <span className={css.cardStatus} data-status="outdated">{tt('host.outdated')}</span>}
                   {host.tags.slice(0, 2).map(tag => <span key={tag} className={css.chip}>{tag}</span>)}
                 </div>
               </td>
@@ -595,8 +594,11 @@ function HostCard({ host, onOpen }: { host: ProbeHost; onOpen: () => void }) {
             ? `${current.hostname} · ${current.os}`
             : host.location !== '' ? host.location : tt('card.noData')}
         </span>
-        {tags.length > 0 && (
+        {(tags.length > 0 || host.agentOutdated) && (
           <span className={css.chipRow}>
+            {host.agentOutdated && (
+              <span className={css.cardStatus} data-status="outdated">{tt('host.outdated')}</span>
+            )}
             {tags.slice(0, 3).map(tag => <span key={tag} className={css.chip}>{tag}</span>)}
           </span>
         )}

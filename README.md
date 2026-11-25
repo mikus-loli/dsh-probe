@@ -40,7 +40,10 @@ dsh plugin --profile web add github:mikus-loli/dsh-probe
 # 重启 dsh web，然后在 Plugins 页确认 Probe 行已启用
 ```
 
-升级面板与 agent 的完整步骤、数据迁移、回滚与兼容策略见 **[docs/UPGRADING.md](docs/UPGRADING.md)**。简单说：面板用 `git pull` + `node build.mjs` 后重载插件；agent 在面板里点「可升级」拿到升级命令，替换文件并重启服务即可，令牌不变。
+升级面板与 agent 的完整步骤、数据迁移、回滚与兼容策略见 **[docs/UPGRADING.md](docs/UPGRADING.md)**。
+
+![升级 Agent](docs/upgrade.png)
+简单说：面板用 `git pull` + `node build.mjs` 后重载插件；agent 在面板里点「可升级」拿到升级命令，替换文件并重启服务即可，令牌不变。
 
 ## 它做什么
 

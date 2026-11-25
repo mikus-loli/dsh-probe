@@ -1570,7 +1570,8 @@
   background: var(--dsw-alias-markdown-code-block);
   border: 1px solid var(--probe-line);
   border-radius: 8px;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .installSummary {
