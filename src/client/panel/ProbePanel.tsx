@@ -1011,8 +1011,6 @@ function HostDialog({ mode, host, api, onClose, onSaved }: {
 }
 
 /** Which agent flavor the install card composes commands for. */
-type AgentKind = 'binary' | 'shell' | 'node'
-
 /** Build the three install command blocks for one host. */
 /**
  * Where the published builds live. The installer is served from the repository's
@@ -1023,61 +1021,25 @@ type AgentKind = 'binary' | 'shell' | 'node'
 const RELEASE_INSTALLER = 'https://raw.githubusercontent.com/mikus-loli/dsh-probe/main/install.sh'
 
 /** Build the install commands shown for one host. */
-function installCommands(origin: string, host: ProbeHost, intervalSec: number, kind: AgentKind = 'binary') {
+function installCommands(origin: string, host: ProbeHost, intervalSec: number) {
   const base = origin.replace(/\/+$/, '')
-
-  if (kind === 'binary') {
-    const command = [
-      `curl -fsSL ${RELEASE_INSTALLER} \\`,
-      `  | sudo DSPROBE_SERVER=${base} \\`,
-      `      DSPROBE_TOKEN=${host.token} \\`,
-      `      DSPROBE_NAME=${JSON.stringify(host.name)} \\`,
-      `      DSPROBE_INTERVAL=${intervalSec} sh`,
-    ].join('\n')
-    const upgrade = `curl -fsSL ${RELEASE_INSTALLER} \\
-  | sudo DSPROBE_SERVER=${base} DSPROBE_TOKEN=${host.token} sh`
-    return {
-      download: command,
-      run: `${host.name} starts reporting immediately after the installer finishes`,
-      systemd: 'The installer writes /etc/systemd/system/dsh-probe-agent.service and enables it.',
-      upgrade,
-    }
+  const download = [
+    `curl -fsSL ${RELEASE_INSTALLER} \\`,
+    `  | sudo DSPROBE_SERVER=${base} \\`,
+    `      DSPROBE_TOKEN=${host.token} \\`,
+    `      DSPROBE_NAME=${JSON.stringify(host.name)} \\`,
+    `      DSPROBE_INTERVAL=${intervalSec} sh`,
+  ].join('\n')
+  const upgrade = [
+    `curl -fsSL ${RELEASE_INSTALLER} \\`,
+    `  | sudo DSPROBE_SERVER=${base} DSPROBE_TOKEN=${host.token} sh`,
+  ].join('\n')
+  return {
+    download,
+    run: 'The installer downloads the release binary and starts it; it reports immediately.',
+    systemd: 'The installer writes /etc/systemd/system/dsh-probe-agent.service and enables it.',
+    upgrade,
   }
-
-  const script = kind === 'shell' ? 'dsh-probe-agent.sh' : 'dsh-probe-agent.mjs'
-  const env = [
-    `DSPROBE_SERVER=${base}`,
-    `DSPROBE_TOKEN=${host.token}`,
-    `DSPROBE_NAME=${JSON.stringify(host.name)}`,
-    `DSPROBE_INTERVAL=${intervalSec}`,
-  ].join(' \\\n  ')
-  const download = kind === 'shell'
-    ? `curl -fsSL ${base}/auth/dsh-probe/agent.sh -o /usr/local/bin/${script} && chmod 755 /usr/local/bin/${script}`
-    : `curl -fsSL ${base}/auth/dsh-probe/agent.mjs -o /usr/local/bin/${script}`
-  const run = `${env} \\\n  ${kind === 'shell' ? '/bin/sh' : 'node'} /usr/local/bin/${script}`
-  const execStart = kind === 'shell' ? `/bin/sh /usr/local/bin/${script}` : `/usr/bin/env node /usr/local/bin/${script}`
-  const upgrade = `${download}\nsystemctl restart dsh-probe-agent`
-  const systemd = `cat >/etc/systemd/system/dsh-probe-agent.service <<'EOF'
-[Unit]
-Description=DSH probe agent
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Environment=${envValue(`DSPROBE_SERVER=${base}`)}
-Environment=${envValue(`DSPROBE_TOKEN=${host.token}`)}
-Environment=${envValue(`DSPROBE_NAME=${host.name}`)}
-Environment=${envValue(`DSPROBE_INTERVAL=${intervalSec}`)}
-ExecStart=${execStart}
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl daemon-reload && systemctl enable --now dsh-probe-agent
-journalctl -u dsh-probe-agent -n 20 --no-pager`
-  return { download, run, systemd, upgrade }
 }
 
 /** The agent install dialog: origin, token, and copyable commands. */
@@ -1097,7 +1059,6 @@ function InstallDialog({ host, settings, api, latestAgent, onClose, onHostChange
     }
   })()
   const [origin, setOrigin] = useState(stored !== '' ? stored : window.location.origin)
-  const [kind, setKind] = useState<AgentKind>('binary')
   const [showToken, setShowToken] = useState(false)
   const [confirmRotate, setConfirmRotate] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1109,7 +1070,7 @@ function InstallDialog({ host, settings, api, latestAgent, onClose, onHostChange
   const intervalSec = settings?.reportIntervalSec ?? 3
   const originValue = origin.trim().replace(/\/+$/, '')
   const originValid = /^https?:\/\/\S+$/.test(originValue)
-  const commands = installCommands(originValue, host, intervalSec, kind)
+  const commands = installCommands(originValue, host, intervalSec)
   const all = `# 1. download\n${commands.download}\n\n# 2. foreground test\n${commands.run}\n\n# 3. systemd\n${commands.systemd}`
     + (host.agentOutdated ? `\n\n# upgrade\n${commands.upgrade}` : '')
 
@@ -1165,23 +1126,7 @@ function InstallDialog({ host, settings, api, latestAgent, onClose, onHostChange
               : <span className={css.fieldError} role="alert">{tt('install.invalidOrigin')}</span>}
           </label>
 
-          <div className={css.field}>
-            <span className={css.fieldLabel}>{tt('install.kind')}</span>
-            <div className={css.rangePills}>
-              {(['binary', 'shell', 'node'] as AgentKind[]).map(item => (
-                <button
-                  key={item}
-                  type="button"
-                  className={css.pill}
-                  data-active={kind === item ? 'true' : undefined}
-                  onClick={() => setKind(item)}
-                >
-                  {tt(`install.${item}` as ProbeKey)}
-                </button>
-              ))}
-            </div>
-            <span className={css.hint}>{tt(`install.${kind}Hint` as ProbeKey)}</span>
-          </div>
+          <p className={css.hint}>{tt('install.binaryHint')}</p>
 
           <div className={css.tokenBlock}>
             <span className={css.fieldLabel}>{tt('install.token')}</span>

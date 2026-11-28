@@ -65,21 +65,16 @@ test('host lifecycle, ingest, mute and notify test over HTTP', async () => {
   assert.deepEqual(out.json.hosts, [])
 })
 
-test('version manifest and agent sources are served without a token', async () => {
+test('the version manifest points at the release channel', async () => {
   tempHome()
   const { service } = makeService()
   const table = makeRouteTable(service)
 
-  let out = await call(route(table, '/auth/dsh-probe/version.json').handler, { url: '/auth/dsh-probe/version.json' })
+  const out = await call(route(table, '/auth/dsh-probe/version.json').handler, { url: '/auth/dsh-probe/version.json' })
   assert.equal(out.status, 200)
   assert.equal(out.json.panel, PANEL_VERSION)
   assert.equal(out.json.agent, AGENT_VERSION)
-  assert.equal(out.json.agents.length, 2)
-
-  out = await call(route(table, '/auth/dsh-probe/agent.sh').handler, { url: '/auth/dsh-probe/agent.sh' })
-  assert.equal(out.status, 200)
-  assert.match(out.headers['content-type'], /shellscript/)
-  out = await call(route(table, '/auth/dsh-probe/agent.mjs').handler, { url: '/auth/dsh-probe/agent.mjs' })
-  assert.equal(out.status, 200)
-  assert.match(out.text, /dsh-probe-agent/)
+  // The agent is a published binary: the panel points at the release instead of
+  // serving a script, so there is no in-panel download to test any more.
+  assert.match(out.json.agentDownload, /github\.com\/mikus-loli\/dsh-probe\/releases\/latest$/)
 })

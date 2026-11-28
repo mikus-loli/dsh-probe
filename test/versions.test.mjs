@@ -31,12 +31,3 @@ test('the release workflow builds the agent', () => {
   assert.match(workflow, /action-gh-release/)
 })
 
-test('agent scripts report the shared version', () => {
-  const node = spawnSync(process.execPath, [join(ROOT, 'agent', 'agent.mjs'), '--version'], { encoding: 'utf8' })
-  assert.equal(node.status, 0)
-  assert.match(node.stdout, new RegExp(`dsh-probe-agent ${AGENT_VERSION}`))
-
-  const shell = spawnSync('sh', [join(ROOT, 'agent', 'agent.sh'), '--version'], { encoding: 'utf8' })
-  assert.equal(shell.status, 0)
-  assert.match(shell.stdout, new RegExp(`dsh-probe-agent ${AGENT_VERSION}`))
-})

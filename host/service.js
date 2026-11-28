@@ -314,10 +314,9 @@ export class ProbeService {
     if (host === undefined) throw new ProbeError('host not found', 404)
     const event = enqueueEvent(id, 'agent.switchVersion', {
       version: this.agentVersion,
-      // Paths are relative on purpose: the agent already knows the base URL it
-      // reports to, and a relative path keeps the event portable.
-      shell: '/auth/dsh-probe/agent.sh',
-      node: '/auth/dsh-probe/agent.mjs',
+      // The agent resolves its own platform asset from the release of this
+      // version; the panel only names the version.
+      channel: 'github-release',
     })
     return {
       queued: true,

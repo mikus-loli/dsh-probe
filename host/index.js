@@ -106,8 +106,6 @@ export function apply(ctx, config) {
   const routes = makeRoutes({
     service,
     connection,
-    agentPath: join(here, '..', 'agent', 'agent.mjs'),
-    shellAgentPath: join(here, '..', 'agent', 'agent.sh'),
     flagDir: join(here, '..', 'assets', 'flags'),
   })
   const tools = probeTools(service)

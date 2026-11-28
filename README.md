@@ -12,8 +12,8 @@
 panel:  host/          DSH 插件宿主侧：存储、指标、告警、路由、工具
         src/client/    Web 面板（React + CSS modules）
         lib/client.js  构建产物（已提交，克隆即可用）
-agent:  agent/agent.sh  零运行时 Shell 上报器（推荐）
-        agent/agent.mjs Node 单文件上报器
+agent:  agent/go/      上报程序源码（编译为单个静态二进制）
+        install.sh     从 GitHub Release 安装/升级的脚本
 shared: test/ 文档  docs/UPGRADING.md  CI  .github/workflows/ci.yml
 ```
 
@@ -47,7 +47,7 @@ dsh plugin --profile web add github:mikus-loli/dsh-probe
 
 ## 它做什么
 
-- **轻量 agent 主动上报**：每台被监控服务器跑一个单文件 agent（默认 `agent.sh`：只要 `sh`、`awk`、`df`、`curl`；也可选 `agent.mjs`：Node 18+，零 npm 依赖），读取本机 `/proc`、`/sys/class/net` 与 `df` 后 POST 给 DSH。目标机不需要开 SSH 端口，也无需安装运行时以外的任何东西。
+- **轻量 agent 主动上报**：每台被监控服务器跑一个编译好的单个静态二进制（约 5.8 MB，无任何运行时依赖），读取本机 `/proc`、`/sys/class/net` 后 POST 给 DSH。目标机不需要开 SSH 端口，也不需要装任何东西。
 - **实时卡片与表格**：卡片显示 CPU / 内存 / 磁盘三条进度条、CPU 迷你曲线、负载、上下行速率、运行时长与在线状态；也可以切到表格视图按列排序。顶部汇总在线主机、活动告警、平均 CPU / 内存，支持按名称/标签/位置搜索和按在线状态筛选。
 - **趋势**：最近 1 小时的原始采样（内存环形缓冲）+ 每分钟一档、保留 7 天的磁盘历史（可调 1–30 天）。
 - **告警**：CPU / 内存 / 磁盘 / 每核负载持续超过阈值、或主机停止上报时触发；恢复后自动解除。规则、阈值、持续时长在「设置」里改；支持按主机「静默 1 小时」（维护窗口，期间照常收集指标但不告警）。
@@ -63,15 +63,22 @@ dsh plugin --profile web add github:mikus-loli/dsh-probe
 
 ## Agent
 
-- 只支持 Linux（读取 `/proc/stat`、`/proc/meminfo`、`/proc/loadavg`、`/sys/class/net`，磁盘用 `df`）。
-- 两种形态，安装卡片里可切换：
-  - **Shell（推荐）**：`agent.sh`，依赖 `sh`、`awk`、`df` 和 `curl`（没有 curl 时退回 `wget`）。每次上报先用 1 秒采样两次计数器，因此 CPU 百分比与网络速率无需落盘状态。
-  - **Node 脚本**：`agent.mjs`，单文件、零 npm 依赖，适合已装 Node 18+ 的机器。
-- 配置：`DSPROBE_SERVER`、`DSPROBE_TOKEN`、`DSPROBE_NAME`、`DSPROBE_INTERVAL`（默认 3 秒）、`DSPROBE_DISK`（默认 `/`）。
-- 令牌只对一台主机有效；泄露后在面板「轮换令牌」即可作废，然后在服务器上换新令牌重启 agent。
-- agent 源码就在仓库的 `agent/` 目录，同时由插件直接提供下载（`/auth/dsh-probe/agent.sh`、`/auth/dsh-probe/agent.mjs`），不含任何密钥。
-- 版本：`sh agent.sh --version` / `node agent.mjs --version`；面板通过每次上报的 `agentVersion` 判断某台主机是否需要升级。
-- 上报协议只新增字段，旧 agent 可以继续配合新面板工作。
+- 只支持 Linux（读取 `/proc/stat`、`/proc/meminfo`、`/proc/loadavg`、`/sys/class/net`，磁盘用 `df` 系统调用）。
+- **单一形态：编译后的程序**，无任何运行时依赖。发布的资产按平台划分：
+  `dsh-probe-agent_<version>_linux_{amd64,arm64,arm7,386}`。
+- 安装（一条命令，从 GitHub Release 取最新版）：
+
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/mikus-loli/dsh-probe/main/install.sh \
+    | sudo DSPROBE_SERVER=https://dsh.example.com DSPROBE_TOKEN=<主机令牌> sh
+  ```
+
+  安装脚本会校验 `SHA256SUMS`、把二进制放到 `/usr/local/bin/dsh-probe-agent`，
+  并写入 `dsh-probe-agent.service` 后启动。目标机只需要能访问 GitHub，不需要能访问面板。
+- 配置：`DSPROBE_SERVER`、`DSPROBE_TOKEN`、`DSPROBE_NAME`、`DSPROBE_INTERVAL`（默认 3 秒）、`DSPROBE_DISK`（默认 `/`）、`DSPROBE_PUBLIC_IP`（内网/NAT 主机可显式指定出口 IP）。
+- 令牌只对一台主机有效；泄露后在面板「轮换令牌」即可作废，然后用新令牌重跑安装脚本。
+- 升级：面板点「升级 agent」会下发版本号，agent 自己从对应 Release 下载、校验 `--version`、原子替换后原地重启。
+- 发布：`git tag v0.4.0 && git push origin v0.4.0`，Actions 会构建四个平台并附上校验和。
 
 ## 数据与安全
 

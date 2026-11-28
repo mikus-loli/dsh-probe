@@ -212,7 +212,9 @@ test('an upgrade queues a switchVersion event for that host only', async () => {
   assert.equal(events.length, 1)
   assert.equal(events[0].method, 'agent.switchVersion')
   assert.equal(events[0].params.version, '9.9.9')
-  assert.match(events[0].params.shell, /agent\.sh$/)
+  // The agent resolves its own platform asset from the release; the panel
+  // only names the version and the channel.
+  assert.equal(events[0].params.channel, 'github-release')
   // A second host must not see the first host's command.
   const other = store.create({ name: 'other-host' })
   assert.equal(take(other.id, [], 8).length, 0)

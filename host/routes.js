@@ -29,8 +29,6 @@ import { AGENT_VERSION, PANEL_VERSION, SCHEMA_VERSION } from './version.js'
 export const PROBE_PATHS = {
   panel: '/api/dsh-probe',
   ingest: '/auth/dsh-probe/ingest',
-  agent: '/auth/dsh-probe/agent.mjs',
-  shellAgent: '/auth/dsh-probe/agent.sh',
   /** Country flags, one SVG per ISO 3166-1 alpha-2 code. */
   flags: '/auth/dsh-probe/flags',
   version: '/auth/dsh-probe/version.json',
@@ -313,10 +311,9 @@ function versionRoute() {
         panel: PANEL_VERSION,
         agent: AGENT_VERSION,
         schema: SCHEMA_VERSION,
-        agents: [
-          { kind: 'shell', path: PROBE_PATHS.shellAgent, version: AGENT_VERSION },
-          { kind: 'node', path: PROBE_PATHS.agent, version: AGENT_VERSION },
-        ],
+        // The agent is a published binary now: release assets live on GitHub
+        // and are installed by `install.sh`, so the panel no longer serves one.
+        agentDownload: 'https://github.com/mikus-loli/dsh-probe/releases/latest',
       })
     },
   }
@@ -403,16 +400,12 @@ function sourceRoute(path, agentPath, contentType) {
  * Build the probe's route table.
  * @param options.service - probe operations.
  * @param options.connection - reader for the deployment's connection trust.
- * @param options.agentPath - absolute path of the packaged agent.mjs.
- * @param options.shellAgentPath - absolute path of the packaged agent.sh.
  * @param options.flagDir - absolute path of the packaged flag directory.
  */
 export function makeRoutes(options) {
   return [
     panelRoute(options.service, options.connection),
     ingestRoute(options.service),
-    sourceRoute(PROBE_PATHS.agent, options.agentPath, 'text/javascript; charset=utf-8'),
-    sourceRoute(PROBE_PATHS.shellAgent, options.shellAgentPath, 'text/x-shellscript; charset=utf-8'),
     flagRoute(options.flagDir),
     versionRoute(),
   ]
