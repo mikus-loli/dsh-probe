@@ -338,7 +338,11 @@ func readGPU() *gpu {
 }
 
 // charsToString trims a NUL-terminated C char array.
-func charsToString(raw []int8) string {
+//
+// syscall.Utsname declares these arrays as [65]int8 on most architectures but
+// [65]uint8 on arm, so the conversion is generic rather than typed to one of
+// them — otherwise the arm release build fails while amd64 passes.
+func charsToString[T int8 | uint8](raw []T) string {
 	out := make([]byte, 0, len(raw))
 	for _, value := range raw {
 		if value == 0 {
