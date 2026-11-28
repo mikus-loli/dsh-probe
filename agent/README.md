@@ -1,11 +1,24 @@
 # dsh-probe agent
 
-One small reporter per monitored server. Two implementations ship here:
+One small reporter per monitored server.
 
-| File | Runtime | Notes |
+| Implementation | Runtime | Notes |
 | --- | --- | --- |
-| `agent.sh` | `sh`, `awk`, `df`, `curl` (or `wget`) | Recommended; no Node needed |
-| `agent.mjs` | Node 18+ | Single file, no npm install |
+| `agent/go/` | none (static binary) | **Recommended.** Published per release as `dsh-probe-agent_<version>_<os>_<arch>` |
+| `agent.sh` | `sh`, `awk`, `df`, `curl` (or `wget`) | Fallback for hosts that cannot fetch a release |
+| `agent.mjs` | Node 18+ | Fallback, single file, no npm install |
+
+The Go binary is the primary agent: it is installed from a GitHub release, not
+from the panel, so a monitored machine only needs outbound HTTPS. It also
+upgrades itself from the same release channel.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mikus-loli/dsh-probe/main/install.sh \
+  | sudo DSPROBE_SERVER=https://dsh.example.com DSPROBE_TOKEN=<host token> sh
+```
+
+Releasing: `git tag v0.4.0 && git push origin v0.4.0` builds linux
+amd64/arm64/armv7/386, writes `SHA256SUMS`, and attaches them to the release.
 
 Both read the same Linux counters (`/proc/stat`, `/proc/meminfo`, `/proc/loadavg`,
 `/sys/class/net/*/statistics`, `df`) and POST one JSON report per interval to the

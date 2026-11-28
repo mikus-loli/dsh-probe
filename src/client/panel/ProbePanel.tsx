@@ -1011,11 +1011,39 @@ function HostDialog({ mode, host, api, onClose, onSaved }: {
 }
 
 /** Which agent flavor the install card composes commands for. */
-type AgentKind = 'shell' | 'node'
+type AgentKind = 'binary' | 'shell' | 'node'
 
 /** Build the three install command blocks for one host. */
-function installCommands(origin: string, host: ProbeHost, intervalSec: number, kind: AgentKind = 'shell') {
+/**
+ * Where the published builds live. The installer is served from the repository's
+ * default branch so it is always the current one, and it resolves the binary from
+ * the latest release — a monitored machine never needs this panel to be reachable
+ * in order to install or update.
+ */
+const RELEASE_INSTALLER = 'https://raw.githubusercontent.com/mikus-loli/dsh-probe/main/install.sh'
+
+/** Build the install commands shown for one host. */
+function installCommands(origin: string, host: ProbeHost, intervalSec: number, kind: AgentKind = 'binary') {
   const base = origin.replace(/\/+$/, '')
+
+  if (kind === 'binary') {
+    const command = [
+      `curl -fsSL ${RELEASE_INSTALLER} \\`,
+      `  | sudo DSPROBE_SERVER=${base} \\`,
+      `      DSPROBE_TOKEN=${host.token} \\`,
+      `      DSPROBE_NAME=${JSON.stringify(host.name)} \\`,
+      `      DSPROBE_INTERVAL=${intervalSec} sh`,
+    ].join('\n')
+    const upgrade = `curl -fsSL ${RELEASE_INSTALLER} \\
+  | sudo DSPROBE_SERVER=${base} DSPROBE_TOKEN=${host.token} sh`
+    return {
+      download: command,
+      run: `${host.name} starts reporting immediately after the installer finishes`,
+      systemd: 'The installer writes /etc/systemd/system/dsh-probe-agent.service and enables it.',
+      upgrade,
+    }
+  }
+
   const script = kind === 'shell' ? 'dsh-probe-agent.sh' : 'dsh-probe-agent.mjs'
   const env = [
     `DSPROBE_SERVER=${base}`,
@@ -1069,7 +1097,7 @@ function InstallDialog({ host, settings, api, latestAgent, onClose, onHostChange
     }
   })()
   const [origin, setOrigin] = useState(stored !== '' ? stored : window.location.origin)
-  const [kind, setKind] = useState<AgentKind>('shell')
+  const [kind, setKind] = useState<AgentKind>('binary')
   const [showToken, setShowToken] = useState(false)
   const [confirmRotate, setConfirmRotate] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1140,7 +1168,7 @@ function InstallDialog({ host, settings, api, latestAgent, onClose, onHostChange
           <div className={css.field}>
             <span className={css.fieldLabel}>{tt('install.kind')}</span>
             <div className={css.rangePills}>
-              {(['shell', 'node'] as AgentKind[]).map(item => (
+              {(['binary', 'shell', 'node'] as AgentKind[]).map(item => (
                 <button
                   key={item}
                   type="button"

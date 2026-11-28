@@ -2,3 +2,5 @@ node_modules/
 *.log
 .DS_Store
 coverage/
+# Go build output — the release workflow publishes the binaries.
+agent/go/dsh-probe-agent*

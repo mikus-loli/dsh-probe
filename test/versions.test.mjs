@@ -14,6 +14,23 @@ test('package, host and agent versions agree', () => {
   assert.equal(SCHEMA_VERSION, 2)
 })
 
+test('the Go agent carries the shared version', () => {
+  // The published binary is the primary agent now, so its constant has to move
+  // with the panel's; a stale one makes every host look out of date.
+  const source = readFileSync(join(ROOT, 'agent', 'go', 'version.go'), 'utf8')
+  const match = /const version = "([^"]+)"/.exec(source)
+  assert.notEqual(match, null, 'agent/go/version.go must declare a version constant')
+  assert.equal(match[1], AGENT_VERSION)
+})
+
+test('the release workflow builds the agent', () => {
+  const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8')
+  // A tag must produce binaries, or install.sh has nothing to download.
+  assert.match(workflow, /tags:/)
+  assert.match(workflow, /go build/)
+  assert.match(workflow, /action-gh-release/)
+})
+
 test('agent scripts report the shared version', () => {
   const node = spawnSync(process.execPath, [join(ROOT, 'agent', 'agent.mjs'), '--version'], { encoding: 'utf8' })
   assert.equal(node.status, 0)
