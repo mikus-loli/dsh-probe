@@ -1,11 +1,11 @@
 # 升级方案
 
-面板端（DSH 插件）与 agent 端（`agent/agent.sh`、`agent/agent.mjs`）在同一个仓库、同一个版本号发布：`package.json`、`host/version.js` 与两个 agent 脚本里的版本必须一致（`test/versions.test.mjs` 会检查）。
+面板端（DSH 插件）与 agent 端（`agent/go/`，编译为单个静态二进制）在同一个仓库、同一个版本号发布：`package.json`、`host/version.js` 与 `agent/go/version.go` 里的版本必须一致（`test/versions.test.mjs` 会检查）。
 
 ## 版本从哪看
 
-- 面板运行时：`GET /auth/dsh-probe/version.json` 返回 `{ panel, agent, schema, agents }`（公开、无密钥）。
-- 面板界面：设置页底部显示「面板 x.y.z · Agent x.y.z」；每台主机的详情页显示该主机 agent 的版本。
+- 面板运行时：`GET /auth/dsh-probe/version.json` 返回 `{ panel, agent, schema, agentDownload }`（公开、无密钥）。
+- 面板界面：监控墙底部显示「Panel x.y.z · Agent x.y.z」；点节点卡片弹出的详情里显示该主机 agent 的版本。
 - 主机列表/表格：agent 版本落后时显示「可升级」标记。
 
 ## 面板端升级
@@ -53,25 +53,47 @@ node build.mjs
 
 ## Agent 端升级
 
-agent 是单文件、无状态上报者，升级只需替换文件并重启服务，**令牌与 systemd 配置不变**：
+agent 是无状态上报程序，升级只替换二进制并重启，**令牌与 systemd 配置不变**。
+
+### 从面板触发（推荐）
+
+主机显示「可升级」时，打开该主机的「安装与令牌」，点「升级 agent」或复制其中的命令。
+面板会下发 `agent.switchVersion` 事件，agent 自己完成：按版本拼出对应平台的 Release 资产 URL →
+下载 → 执行 `--version` 校验 → 原地原子替换 → `exec` 重启。
+
+### 在服务器上手动升级
+
+重跑安装脚本即可，它会解析最新 Release 并覆盖安装：
 
 ```sh
-curl -fsSL https://<你的DSH地址>/auth/dsh-probe/agent.sh -o /usr/local/bin/dsh-probe-agent.sh
-chmod 755 /usr/local/bin/dsh-probe-agent.sh
-systemctl restart dsh-probe-agent
+curl -fsSL https://raw.githubusercontent.com/mikus-loli/dsh-probe/main/install.sh \
+  | sudo DSPROBE_SERVER=https://dsh.example.com DSPROBE_TOKEN=<该主机令牌> sh
 ```
 
-面板里更省事：主机显示「可升级」时，打开该主机的「安装与令牌」，复制「升级 Agent（保留令牌）」一块命令即可。Node 版本把 URL 换成 `/auth/dsh-probe/agent.mjs`、启动命令换成 `node`。
+只想固定到某个版本时加 `DSPROBE_AGENT_VERSION=0.4.0`。
 
-批量升级（可选）：
+批量升级（可选，令牌按主机各不相同）：
 
 ```sh
 for host in web-1 api-2 db-1; do
-  ssh "$host" 'curl -fsSL https://dsh.example.com/auth/dsh-probe/agent.sh -o /usr/local/bin/dsh-probe-agent.sh && chmod 755 /usr/local/bin/dsh-probe-agent.sh && systemctl restart dsh-probe-agent'
+  ssh "$host" 'sudo systemctl restart dsh-probe-agent'   # 若已配好自动升级
 done
 ```
 
-升级后几秒内，面板上的「可升级」标记会消失；`sh agent.sh --version` / `node agent.mjs --version` 可确认版本。
+升级后几秒内面板上的「可升级」标记消失；`dsh-probe-agent --version` 可确认版本。
+
+### 发布新版本
+
+```sh
+# 三处版本号改成同一个值：package.json、host/version.js、agent/go/version.go
+node build.mjs && node --test test/*.test.mjs
+git commit -am "chore(release): v0.4.1"
+git tag v0.4.1 && git push origin main --tags
+```
+
+tag 会触发 `.github/workflows/release.yml`：矩阵编译 linux amd64/arm64/arm7/386、生成
+`SHA256SUMS`、连同 Release Notes 一起发布。**版本号没对齐时测试会先失败**，避免发出去一个
+资产名对不上的版本。
 
 ## 兼容策略
 

@@ -1,8 +1,69 @@
 # Changelog
 
-All notable changes to this project are documented here. The panel and the
-agent scripts are released together; their versions always match
-(`host/version.js`).
+All notable changes to this project are documented here. The panel and the agent
+are released together; their versions always match (`host/version.js` and
+`agent/go/version.go`). Entries that mention `agent.sh` / `agent.mjs` describe
+releases from before 0.4.0, when the agent was still a script.
+
+## 0.4.0 — 2026-11-29
+
+The panel becomes a reproduction of the Komari Mikus theme, and the agent becomes
+a real program published from this repository.
+
+### Agent — now a binary
+
+- `agent/go/` replaces `agent.sh` and `agent.mjs`. One static binary, no runtime
+  dependency, about 5.8 MB after stripping.
+- Published per release as `dsh-probe-agent_<version>_linux_{amd64,arm64,arm7,386}`
+  with `SHA256SUMS`, built by `.github/workflows/release.yml` on a `v*` tag.
+- `install.sh` resolves the latest release, verifies the checksum, installs
+  `/usr/local/bin/dsh-probe-agent` and registers the systemd unit. A monitored
+  machine needs outbound HTTPS only — never the panel.
+- The panel no longer serves agent sources; `version.json` points at the release
+  channel instead.
+- Self-upgrade downloads the matching release asset, verifies `--version`, and
+  replaces itself in place (same event, new source).
+- Latency probes (ICMP / TCP / HTTP) moved into the binary; the TCP probe now
+  measures the handshake directly instead of shelling out to curl.
+
+### Panel — the theme, ported
+
+- The theme's own stylesheets ship with the plugin: 13 files, re-rooted under the
+  panel element at build time so they cannot repaint the GUI. Keyframes are
+  renamed and their `animation` references rewritten in one pass.
+- The monitoring page emits the upstream DOM: `.header`, `.welcome-section` with
+  the mascot and sakura petals, `.stats-bar` with the group filter,
+  `.nodes-grid`, `.nodes-table-container`, footer.
+- Clicking a card opens the upstream node modal: 12-item `.modal-info` grid,
+  time-range control, and the theme's canvas charts (grid, gradient fill, dots,
+  first/last time labels, hover tooltip).
+- The table view is the theme's `.table-card` list, not a `<table>`.
+- Real SVG flags served from `/auth/dsh-probe/flags/<cc>.svg`; the theme's OS
+  icons are inlined as data URIs so they survive the lack of a base URL.
+- The invented tab bar is gone. Monitoring reads; the console (left rail: hosts,
+  latency, alerts, settings) mutates.
+- Theme toggle with a persisted choice; the detail modal follows it.
+
+### Backend
+
+- Region detection follows Komari: mmdb (offline), ip-api, geojs, ipinfo, with
+  automatic fallback and a per-provider cache.
+- Agents report their own egress address, so a host reporting over loopback is
+  still located.
+- Server-to-agent event queue (ack + TTL) carries latency probes and version
+  switches.
+- Latency tasks (ICMP / TCP / HTTP) with per-host sample rings.
+
+### Fixes
+
+- The theme's `* { margin:0; padding:0 }` outranked single-class rules and zeroed
+  the console's padding; the theme scope is now the wall only.
+- Keyframe references pointed at renamed frames, leaving the modal's info items
+  at `opacity: 0` — present in the DOM, invisible on screen.
+- The modal rendered outside the theme subtree and never received
+  `position: fixed`.
+- `syscall.Utsname` is `[65]int8` on amd64 but `[65]uint8` on arm, which broke
+  only the armv7 release build.
 
 ## 0.3.0 — 2026-11-26
 

@@ -9,27 +9,33 @@
 仓库同时包含**面板端**（`host/` + `src/client/`）与 **agent 端**（`agent/`）：
 
 ```
-panel:  host/          DSH 插件宿主侧：存储、指标、告警、路由、工具
-        src/client/    Web 面板（React + CSS modules）
-        lib/client.js  构建产物（已提交，克隆即可用）
-agent:  agent/go/      上报程序源码（编译为单个静态二进制）
-        install.sh     从 GitHub Release 安装/升级的脚本
-shared: test/ 文档  docs/UPGRADING.md  CI  .github/workflows/ci.yml
+panel:  host/              DSH 插件宿主侧：存储、指标、告警、路由、工具
+        src/client/         Web 面板（React）
+        src/client/theme/   上游 Komari Mikus 主题的 CSS/图片原文件
+        lib/client.js       构建产物（已提交，克隆即可用）
+agent:  agent/go/           上报程序源码（编译为单个静态二进制）
+        install.sh          从 GitHub Release 安装/升级
+assets: assets/flags/       国旗 SVG（面板按 ISO 码下发）
+shared: test/  docs/  CI  .github/workflows/{ci,release}.yml
 ```
 
 ## 界面
 
-概览（汇总、搜索筛选、卡片视图）：
+监控墙（上游 Komari Mikus 主题：欢迎条、统计条与分组筛选、节点卡片）：
 
-![概览](docs/overview.png)
+![监控墙](docs/overview.png)
 
-表格视图（可排序，窄屏自动隐藏次要列）：
+表格视图（同一主题的紧凑卡片列表，窄屏自动降为单列）：
 
-![表格](docs/table.png)
+![表格视图](docs/table.png)
 
-Webhook 告警通知与测试：
+节点详情（上游弹窗：12 项信息、时间范围切换与 canvas 图表）：
 
-![通知](docs/notify.png)
+![节点详情](docs/detail.png)
+
+告警 Webhook 在管理台的「设置」分区里配置与测试。
+
+管理台从监控墙右上角的齿轮进入，左侧分区：主机 / 延迟监测 / 告警 / 设置。
 
 ## 安装 / 升级
 
@@ -42,13 +48,13 @@ dsh plugin --profile web add github:mikus-loli/dsh-probe
 
 升级面板与 agent 的完整步骤、数据迁移、回滚与兼容策略见 **[docs/UPGRADING.md](docs/UPGRADING.md)**。
 
-![升级 Agent](docs/upgrade.png)
-简单说：面板用 `git pull` + `node build.mjs` 后重载插件；agent 在面板里点「可升级」拿到升级命令，替换文件并重启服务即可，令牌不变。
+简单说：面板用 `git pull` + `node build.mjs` 后重载插件；agent 在面板里点「升级 agent」，
+它会自己从对应 Release 下载、校验版本、原子替换并重启，令牌不变。
 
 ## 它做什么
 
 - **轻量 agent 主动上报**：每台被监控服务器跑一个编译好的单个静态二进制（约 5.8 MB，无任何运行时依赖），读取本机 `/proc`、`/sys/class/net` 后 POST 给 DSH。目标机不需要开 SSH 端口，也不需要装任何东西。
-- **实时卡片与表格**：卡片显示 CPU / 内存 / 磁盘三条进度条、CPU 迷你曲线、负载、上下行速率、运行时长与在线状态；也可以切到表格视图按列排序。顶部汇总在线主机、活动告警、平均 CPU / 内存，支持按名称/标签/位置搜索和按在线状态筛选。
+- **实时卡片与表格**：卡片显示 CPU / RAM / 磁盘 / Swap（无 Swap 时显示负载）四项指标条、累计上下行流量、实时速率与运行时长；也可以切到紧凑卡片列表视图。顶部汇总在线与离线主机数、总吞吐，支持搜索和按标签分组筛选。
 - **趋势**：最近 1 小时的原始采样（内存环形缓冲）+ 每分钟一档、保留 7 天的磁盘历史（可调 1–30 天）。
 - **告警**：CPU / 内存 / 磁盘 / 每核负载持续超过阈值、或主机停止上报时触发；恢复后自动解除。规则、阈值、持续时长在「设置」里改；支持按主机「静默 1 小时」（维护窗口，期间照常收集指标但不告警）。
 - **Webhook 通知**：设置里填一个 http/https 地址，告警开始/解除时 POST 一条 JSON（事件、主机、规则、数值、消息），可「发送测试」验证；由宿主进程直接请求，可指向内网或本机服务（如飞书/钉钉的中转 bot）。
