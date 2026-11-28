@@ -9,10 +9,10 @@
  */
 
 /** Version of the DSH plugin (panel half + host API). */
-export const PANEL_VERSION = '0.4.0'
+export const PANEL_VERSION = '0.4.1'
 
 /** Version reported by agent.sh and agent.mjs. */
-export const AGENT_VERSION = '0.4.0'
+export const AGENT_VERSION = '0.4.1'
 
 /** Current on-disk data schema (hosts.json / settings.json). */
 export const SCHEMA_VERSION = 2

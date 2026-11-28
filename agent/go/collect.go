@@ -298,13 +298,22 @@ func readCPUModel() string {
 
 // readUptime returns seconds since boot.
 func readUptime() uint64 {
-	seconds, ok := readUintFile("/proc/uptime")
-	if ok {
-		// /proc/uptime is "seconds.fraction"; the integer parse above stops at
-		// the dot, which is exactly what we want.
-		return seconds
+	raw, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return 0
 	}
-	return 0
+	// The file is "<seconds>.<centiseconds> <idle>" — ParseUint rejects the
+	// fractional form outright, so take the part before the dot.
+	first := strings.Fields(string(raw))
+	if len(first) == 0 {
+		return 0
+	}
+	whole, _, _ := strings.Cut(first[0], ".")
+	seconds, err := strconv.ParseUint(whole, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return seconds
 }
 
 // readGPU reports the first NVIDIA GPU when nvidia-smi is present.

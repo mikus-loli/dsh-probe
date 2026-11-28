@@ -148,48 +148,6 @@
   box-sizing: border-box;
 }
 
-/* ==========================================================================
-   Page frame
-   ========================================================================== */
-
-.header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  flex: none;
-  flex-wrap: wrap;
-}
-
-.headerText {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--probe-text-primary);
-}
-
-.subtitle {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--probe-text-secondary);
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-
 .body {
   display: flex;
   flex-direction: column;
@@ -207,65 +165,6 @@
   border-radius: 4px;
 }
 .body::-webkit-scrollbar-thumb:hover { background: var(--probe-text-tertiary); }
-
-/* ==========================================================================
-   Segmented tab row (pill)
-   ========================================================================== */
-
-.tabs {
-  display: inline-flex;
-  gap: 4px;
-  flex: none;
-  align-self: flex-start;
-  max-width: 100%;
-  padding: 4px;
-  background: var(--probe-bg-secondary);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-md);
-  box-shadow: var(--probe-shadow-sm);
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--probe-text-secondary);
-  background: transparent;
-  border: none;
-  border-radius: var(--probe-r-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--probe-t-fast), color var(--probe-t-fast);
-}
-
-.tab:hover {
-  color: var(--probe-text-primary);
-  background: var(--probe-bg-tertiary);
-}
-
-.tab[data-active] {
-  color: var(--probe-text-inverse);
-  background: var(--probe-accent);
-  box-shadow: 0 2px 8px rgba(232, 102, 138, 0.25);
-}
-
-.tabCount {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  border-radius: 9px;
-  background: var(--probe-danger);
-  color: #fff;
-}
 
 /* ==========================================================================
    Welcome band (mikus welcome-section)
@@ -290,127 +189,6 @@
   font-weight: 500;
   color: var(--probe-text-secondary);
 }
-
-/* ==========================================================================
-   Stats bar
-   ========================================================================== */
-
-.stats {
-  display: flex;
-  gap: 12px;
-  flex: none;
-  flex-wrap: wrap;
-}
-
-.stat {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 20px;
-  background: var(--probe-bg-card);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-md);
-  box-shadow: var(--probe-shadow-card);
-  transition: box-shadow var(--probe-t), transform var(--probe-t);
-}
-
-.stat:hover {
-  box-shadow: var(--probe-shadow-md);
-  transform: translateY(-2px);
-}
-
-.statLabel {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--probe-text-secondary);
-}
-
-.statValue {
-  font-size: 1.25rem;
-  font-weight: 700;
-  font-family: var(--probe-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--probe-text-primary);
-}
-
-.stat[data-tone='ok'] .statValue { color: var(--probe-success); }
-.stat[data-tone='warn'] .statValue { color: var(--probe-warning); }
-.stat[data-tone='danger'] .statValue { color: var(--probe-danger); }
-
-/* ==========================================================================
-   List bar: search + filters + view toggle
-   ========================================================================== */
-
-.listBar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: none;
-  flex-wrap: wrap;
-}
-
-.searchWrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1 1 240px;
-  min-width: 180px;
-}
-
-.searchGlyph {
-  position: absolute;
-  left: 12px;
-  display: inline-flex;
-  width: 15px;
-  height: 15px;
-  color: var(--probe-text-tertiary);
-  pointer-events: none;
-}
-
-.searchInput {
-  width: 100%;
-  height: 38px;
-  padding: 0 32px 0 36px;
-  font-size: 0.82rem;
-  font-family: inherit;
-  color: var(--probe-text-primary);
-  background: var(--probe-bg-card);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-md);
-  outline: none;
-  transition: border-color var(--probe-t-fast), box-shadow var(--probe-t-fast);
-}
-
-.searchInput::placeholder { color: var(--probe-text-tertiary); }
-
-.searchInput:focus {
-  border-color: var(--probe-accent);
-  box-shadow: 0 0 0 3px rgba(232, 102, 138, 0.15);
-}
-
-.searchClear {
-  position: absolute;
-  right: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  font-size: 0.9rem;
-  color: var(--probe-text-tertiary);
-  background: transparent;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.searchClear:hover {
-  color: var(--probe-text-primary);
-  background: var(--probe-bg-tertiary);
-}
-
-.filterPills,
 .rangePills {
   display: inline-flex;
   gap: 3px;
@@ -443,42 +221,6 @@
   background: var(--probe-accent);
 }
 
-.viewToggle {
-  display: inline-flex;
-  gap: 3px;
-  padding: 3px;
-  background: var(--probe-bg-secondary);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-sm);
-}
-
-.viewButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 28px;
-  padding: 0;
-  color: var(--probe-text-tertiary);
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background var(--probe-t-fast), color var(--probe-t-fast);
-}
-
-.viewButton svg { width: 15px; height: 15px; }
-
-.viewButton:hover {
-  color: var(--probe-text-primary);
-  background: var(--probe-bg-tertiary);
-}
-
-.viewButton[data-active] {
-  color: var(--probe-accent);
-  background: var(--probe-accent-light);
-}
-
 /* ==========================================================================
    Card grid — the mikus node-card, one for one
    ========================================================================== */
@@ -490,154 +232,8 @@
   flex: none;
 }
 
-.card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 20px;
-  overflow: hidden;
-  cursor: pointer;
-  background: var(--probe-bg-card);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-lg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: transform var(--probe-t), box-shadow var(--probe-t), border-color var(--probe-t);
-}
 
-/* Sakura top bar, revealed on hover (mikus ::before) */
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--probe-sakura-1), var(--probe-sakura-2), var(--probe-sakura-3));
-  opacity: 0;
-  transition: opacity var(--probe-t);
-}
 
-/* Mikus diagonal sheen, drawn above the surface but below the content. */
-.card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background: linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.03) 100%);
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  border-color: var(--probe-accent);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04);
-}
-
-.card:hover::before { opacity: 1; }
-
-.card:active { transform: translateY(-2px); transition: transform 0.1s ease; }
-
-/* Offline cards desaturate and dim (mikus .node-card.offline) */
-.card[data-status='offline'],
-.card[data-status='disabled'] {
-  opacity: 0.65;
-  filter: saturate(0.8);
-}
-
-.card[data-status='offline']:hover,
-.card[data-status='disabled']:hover { opacity: 0.85; }
-
-.card[data-status='offline']::before,
-.card[data-status='disabled']::before {
-  background: linear-gradient(90deg, var(--probe-danger), #ff8a95);
-}
-
-.cardTop {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--probe-border-light);
-}
-
-/* Mikus .node-card-header + .node-card-subtitle */
-.cardHeader {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--probe-border-light);
-}
-
-/* Mikus .node-card-flag: a small plate on the left of the identity block.
-   The probe derives the country from the agent's source address, so this holds
-   a real flag emoji; an unresolved host keeps the grey "?" placeholder Mikus
-   uses. */
-.cardCrest {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 24px;
-  overflow: hidden;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
-  border-radius: 4px;
-  background-color: var(--probe-bg-tertiary);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease;
-}
-
-.card:hover .cardCrest { transform: scale(1.05); }
-
-.cardCrestEmpty {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--probe-text-tertiary);
-}
-
-.cardInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-
-.cardNameRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.cardSubtitle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-  overflow: hidden;
-}
-
-.cardOs {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--probe-text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* Pulse status dot */
 .dot {
@@ -666,26 +262,6 @@
 @keyframes probePulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(0.9); }
-}
-
-.hostName {
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--probe-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
-.cardAge {
-  margin-left: auto;
-  font-size: 0.7rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  color: var(--probe-text-tertiary);
-  white-space: nowrap;
 }
 
 .cardStatus {
@@ -722,82 +298,6 @@
   background: var(--probe-accent-light);
 }
 
-.alertChip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  white-space: nowrap;
-  border-radius: 4px;
-  color: var(--probe-danger);
-  background: var(--probe-danger-light);
-}
-
-.cardMeta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.metaText {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--probe-text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
-.chipRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  line-height: 1.5;
-  white-space: nowrap;
-  border-radius: 4px;
-  color: var(--probe-info);
-  background: var(--probe-info-light);
-  flex-shrink: 0;
-  transition: transform var(--probe-t-fast), box-shadow var(--probe-t-fast);
-}
-
-/* Mikus colours a tag by a trailing <colour> marker; the probe keeps the same
-   palette so a tagged host looks the same as it does upstream. */
-.chip[data-tag-color='green'] { color: var(--probe-success); background: var(--probe-success-light); }
-.chip[data-tag-color='red'] { color: var(--probe-danger); background: var(--probe-danger-light); }
-.chip[data-tag-color='blue'] { color: var(--probe-info); background: var(--probe-info-light); }
-.chip[data-tag-color='yellow'],
-.chip[data-tag-color='orange'] { color: var(--probe-warning); background: var(--probe-warning-light); }
-.chip[data-tag-color='purple'],
-.chip[data-tag-color='pink'] { color: var(--probe-accent); background: var(--probe-accent-light); }
-.chip[data-tag-color='gray'] { color: var(--probe-text-secondary); background: var(--probe-bg-tertiary); }
-
-.card:hover .chip { transform: translateY(-1px); }
-
-/* ==========================================================================
-   Metric bars (mikus .metric / .metric-bar / .metric-bar-fill)
-   ========================================================================== */
-
-.gaugeRow,
-.metricGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
 .gauge,
 .metric {
   display: flex;
@@ -814,8 +314,7 @@
   color: var(--probe-text-tertiary);
 }
 
-.gaugeValue,
-.metricValue {
+.gaugeValue{
   font-size: 0.88rem;
   font-weight: 700;
   font-family: var(--probe-mono);
@@ -875,13 +374,6 @@
   flex: none;
 }
 
-.sparkSvg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
 .sparkLine {
   fill: none;
   stroke: var(--probe-chart-cpu);
@@ -899,86 +391,6 @@
   justify-content: center;
   height: 100%;
   font-size: 0.68rem;
-  color: var(--probe-text-tertiary);
-}
-
-/* ==========================================================================
-   Card footer
-   ========================================================================== */
-
-.cardFoot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid var(--probe-border-light);
-}
-
-.footItem {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  font-size: 0.7rem;
-  white-space: nowrap;
-}
-
-.footLabel {
-  font-weight: 500;
-  color: var(--probe-text-tertiary);
-}
-
-.footValue {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  font-family: var(--probe-mono);
-  color: var(--probe-text-secondary);
-}
-
-/* ==========================================================================
-   Empty / loading
-   ========================================================================== */
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  flex: 1;
-  min-height: 260px;
-  padding: 48px 24px;
-  text-align: center;
-  background: var(--probe-bg-card);
-  border: 1px dashed var(--probe-border);
-  border-radius: var(--probe-r-lg);
-}
-
-.emptyGlyph {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  color: var(--probe-text-tertiary);
-  background: var(--probe-bg-tertiary);
-  border-radius: var(--probe-r-md);
-}
-
-.emptyGlyph svg { width: 26px; height: 26px; }
-
-.emptyTitle {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--probe-text-primary);
-}
-
-.emptyText {
-  margin: 0;
-  max-width: 400px;
-  font-size: 0.8rem;
-  line-height: 1.6;
   color: var(--probe-text-tertiary);
 }
 
@@ -1068,19 +480,6 @@
 
 .table tbody tr:hover td { background: var(--probe-bg-card-hover); }
 
-.tableName {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: var(--probe-text-primary);
-}
-
-.nameCell { min-width: 160px; }
-.statusCell { width: 100px; }
-.netCell, .colNet { white-space: nowrap; font-family: var(--probe-mono); font-size: 0.75rem; }
-.seenCell { white-space: nowrap; color: var(--probe-text-tertiary); }
-
 .statusChip {
   display: inline-flex;
   align-items: center;
@@ -1103,11 +502,6 @@
 .statusChip[data-status='waiting'] {
   color: var(--probe-warning);
   background: var(--probe-warning-light);
-}
-
-.rowChevron {
-  color: var(--probe-text-tertiary);
-  font-size: 0.9rem;
 }
 
 .rowOpen { text-align: right; }
@@ -1248,81 +642,6 @@
 .linkButton:hover:not(:disabled) { text-decoration: underline; }
 .linkButton:disabled { opacity: 0.45; cursor: default; }
 
-.sortButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-  font: inherit;
-  font-size: inherit;
-  font-weight: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  color: inherit;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.sortButton:hover { color: var(--probe-accent); }
-
-/* ==========================================================================
-   Banner / error
-   ========================================================================== */
-
-.banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: none;
-  padding: 12px 16px;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: var(--probe-text-secondary);
-  background: var(--probe-bg-card);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-md);
-  box-shadow: var(--probe-shadow-sm);
-  cursor: pointer;
-  transition: box-shadow var(--probe-t-fast);
-}
-
-.banner:hover { box-shadow: var(--probe-shadow-md); }
-
-.banner[data-tone='danger'] {
-  color: var(--probe-danger);
-  background: var(--probe-danger-light);
-  border-color: rgba(231, 76, 94, 0.3);
-}
-
-.banner[data-tone='warn'] {
-  color: var(--probe-warning);
-  background: var(--probe-warning-light);
-  border-color: rgba(245, 166, 35, 0.3);
-}
-
-.bannerIcon {
-  display: inline-flex;
-  flex: none;
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.bannerText { flex: 1; min-width: 0; }
-
-.bannerArrow {
-  flex: none;
-  font-size: 1rem;
-  color: var(--probe-text-tertiary);
-}
-
-.bannerList {
-  margin: 4px 0 0;
-  padding-left: 18px;
-  font-size: 0.75rem;
-  line-height: 1.6;
-}
-
 .errorBar {
   padding: 10px 14px;
   font-size: 0.78rem;
@@ -1330,61 +649,6 @@
   background: var(--probe-danger-light);
   border: 1px solid rgba(231, 76, 94, 0.3);
   border-radius: var(--probe-r-sm);
-}
-
-/* ==========================================================================
-   Detail view
-   ========================================================================== */
-
-.detail {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: none;
-}
-
-.detailHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.detailTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.detailTitle {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--probe-text-primary);
-}
-
-.detailMeta {
-  margin: 6px 0 0;
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: var(--probe-text-tertiary);
-}
-
-.detailActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
 }
 
 .tile {
@@ -1865,19 +1129,6 @@
   border-top: 1px solid var(--probe-border-light);
 }
 
-/* ==========================================================================
-   Install / token blocks
-   ========================================================================== */
-
-.installSummary {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
-  background: var(--probe-bg-tertiary);
-  border-radius: var(--probe-r-md);
-}
-
 .installStatus {
   display: flex;
   align-items: center;
@@ -1995,51 +1246,6 @@
 .notifyTestRow { justify-content: space-between; }
 
 /* ==========================================================================
-   Responsive
-   ========================================================================== */
-
-/* ==========================================================================
-   Late additions: classes referenced by the table view and status marks
-   ========================================================================== */
-
-.colNet,
-.netCell {
-  white-space: nowrap;
-  font-family: var(--probe-mono);
-  font-size: 0.75rem;
-  color: var(--probe-text-secondary);
-}
-
-.tableRow {
-  cursor: pointer;
-  transition: background var(--probe-t-fast);
-}
-
-.tableRow:hover td { background: var(--probe-bg-card-hover); }
-
-/* Small dot/caret marking a host whose agent build is behind the panel. */
-.outdatedMark {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  white-space: nowrap;
-  border-radius: 4px;
-  color: var(--probe-accent);
-  background: var(--probe-accent-light);
-}
-
-.outdatedMark::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-/* ==========================================================================
    OS glyph — one CSS background per distro, all inlined as data URIs above.
    Cards and the detail header both use this so a host reads as
    "[icon] Debian" rather than "Debian GNU/Linux 13 (trixie)".
@@ -2082,20 +1288,6 @@
 /* The Linux glyph is the widest asset; only reference it when a host actually
    reports plain "Linux", keeping the common path light. */
 .osIcon[data-os='linux'] { background-image: var(--probe-os-unknown); }
-
-/* Card header line: [icon] Debian · hostname */
-.osLine {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--probe-text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* ==========================================================================
    Mikus top bar + welcome band + stat cards
@@ -2163,86 +1355,15 @@
   min-width: 0;
 }
 
-/* --- welcome band ---------------------------------------------------------- */
-
-.welcome {
-  position: relative;
-  flex: none;
-  /* Mikus reserve: the mascot hangs above the band, so the band itself must
-     not clip and must leave room for it (`margin-top: 60px` upstream). */
-  overflow: visible;
-  margin-top: 60px;
-  padding: 28px 32px;
-  background: linear-gradient(135deg, var(--probe-bg-card) 0%, var(--probe-bg-tertiary) 50%, var(--probe-bg-card) 100%);
-  background-size: 200% 200%;
-  animation: probeGradientShift 8s ease infinite;
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-lg);
-  box-shadow: var(--probe-shadow-card);
-}
-
 @keyframes probeGradientShift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
-}
-
-.welcomeDeco {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  border-radius: inherit;
-}
-
-.decoCircle {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.1;
-}
-
-.decoCircle[data-i='1'] {
-  width: 200px; height: 200px;
-  top: -80px; right: -50px;
-  background: var(--probe-accent);
-  animation: probeFloat 6s ease-in-out infinite;
-}
-
-.decoCircle[data-i='2'] {
-  width: 150px; height: 150px;
-  bottom: -60px; left: -40px;
-  background: var(--probe-info);
-  animation: probeFloat 8s ease-in-out infinite reverse;
-}
-
-.decoCircle[data-i='3'] {
-  width: 100px; height: 100px;
-  top: 50%; right: 20%;
-  background: var(--probe-success);
-  animation: probeFloat 7s ease-in-out infinite 1s;
 }
 
 @keyframes probeFloat {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-20px) scale(1.05); }
 }
-
-/* Falling sakura petals — the signature Mikus flourish. */
-.sakuraPetal {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 50% 0 50% 50%;
-  background: var(--probe-sakura-1);
-  opacity: 0.4;
-  animation: probeSakuraFall 10s linear infinite;
-}
-
-.sakuraPetal[data-i='0'] { left: 10%; animation-delay: 0s; animation-duration: 12s; }
-.sakuraPetal[data-i='1'] { left: 30%; animation-delay: 2s; animation-duration: 10s; }
-.sakuraPetal[data-i='2'] { left: 50%; animation-delay: 4s; animation-duration: 14s; }
-.sakuraPetal[data-i='3'] { left: 70%; animation-delay: 1s; animation-duration: 11s; }
-.sakuraPetal[data-i='4'] { left: 88%; animation-delay: 3s; animation-duration: 13s; }
-.sakuraPetal[data-i='5'] { left: 20%; animation-delay: 6s; animation-duration: 16s; }
 
 @keyframes probeSakuraFall {
   0% { transform: translateY(-20px) rotate(0deg) scale(0.8); opacity: 0; }
@@ -2251,123 +1372,10 @@
   100% { transform: translateY(140px) rotate(360deg) scale(0.6); opacity: 0; }
 }
 
-.welcomeContent {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.welcomeGreeting {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-width: 0;
-  padding-left: 96px;
-}
-
-/* The mascot overflows the band's top-left corner, exactly as Mikus places it. */
-.greetingMascot {
-  position: absolute;
-  top: -80px;
-  left: -60px;
-  width: 180px;
-  height: 180px;
-  object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
-  animation: probeBounce 2s ease-in-out infinite;
-  transform-origin: bottom center;
-  will-change: transform;
-  z-index: 10;
-}
 
 @keyframes probeBounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
-}
-
-.greetingInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.greetingText {
-  font-size: 1.7rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--probe-text-primary) 0%, var(--probe-accent) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.greetingSubtitle {
-  font-size: 0.85rem;
-  font-weight: 400;
-  color: var(--probe-text-secondary);
-}
-
-.welcomeTime {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  flex: none;
-}
-
-.timeLabel {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--probe-text-secondary);
-}
-
-.timeValue {
-  font-size: 1.9rem;
-  font-weight: 700;
-  font-family: var(--probe-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.05em;
-  background: linear-gradient(135deg, var(--probe-accent) 0%, var(--probe-sakura-2) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.trafficText {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--probe-text-secondary);
-  white-space: nowrap;
-}
-
-/* --- stat cards ------------------------------------------------------------ */
-
-.stats {
-  display: flex;
-  gap: 14px;
-  flex: none;
-  flex-wrap: wrap;
-}
-
-.stat {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 22px;
-  background: var(--probe-bg-card);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-md);
-  box-shadow: var(--probe-shadow-card);
-  transition: box-shadow var(--probe-t), transform var(--probe-t);
-}
-
-.stat:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--probe-shadow-md);
 }
 
 /* --- welcome / stats responsive -------------------------------------------- */
@@ -2455,86 +1463,6 @@
   font-size: 0.76rem;
 }
 
-/* ==========================================================================
-   Top-bar search + view toggle (mikus `.search-box` / `.view-toggle`)
-   ========================================================================== */
-
-.topSearch {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
-  max-width: 280px;
-  min-width: 130px;
-}
-
-.topSearchIcon {
-  position: absolute;
-  left: 11px;
-  width: 15px;
-  height: 15px;
-  color: var(--probe-text-tertiary);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.topSearchInput {
-  width: 100%;
-  height: 34px;
-  padding: 0 12px 0 34px;
-  font-size: 0.82rem;
-  font-family: inherit;
-  color: var(--probe-text-primary);
-  background: var(--probe-bg-tertiary);
-  border: 1px solid var(--probe-border);
-  border-radius: var(--probe-r-sm);
-  outline: none;
-  transition: border-color var(--probe-t-fast), background var(--probe-t-fast), box-shadow var(--probe-t-fast);
-}
-
-.topSearchInput::placeholder { color: var(--probe-text-tertiary); }
-
-.topSearchInput:focus {
-  border-color: var(--probe-accent);
-  background: var(--probe-bg-secondary);
-  box-shadow: 0 0 0 3px rgba(232, 102, 138, 0.15);
-}
-
-.topViewToggle {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex: none;
-  padding: 4px;
-  background: var(--probe-bg-tertiary);
-  border-radius: var(--probe-r-sm);
-}
-
-.topViewButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  color: var(--probe-text-tertiary);
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: color var(--probe-t-fast), background var(--probe-t-fast), transform var(--probe-t-fast);
-}
-
-.topViewButton:hover {
-  color: var(--probe-text-primary);
-  background: var(--probe-bg-secondary);
-}
-
-.topViewButton:active { transform: scale(0.9); }
-
-.topViewButton[data-active] {
-  color: var(--probe-accent);
-  background: var(--probe-bg-secondary);
-}
-
 /* The top bar must not squeeze the search away on narrow screens. */
 /* ==========================================================================
    Footer (mikus `footer.css`): quiet attribution line under the content
@@ -2559,36 +1487,11 @@
   font-size: 0.68rem;
 }
 
-/* ==========================================================================
-   Mikus card entrance + hover micro-interactions
-   (nodes.css: fadeInUp 0.4s with a 50ms stagger per card)
-   ========================================================================== */
-
-.card[data-enter] {
-  opacity: 0;
-  animation: probeFadeInUp 0.4s ease forwards;
-}
-
-.card:nth-child(1)[data-enter] { animation-delay: 0.05s; }
-.card:nth-child(2)[data-enter] { animation-delay: 0.1s; }
-.card:nth-child(3)[data-enter] { animation-delay: 0.15s; }
-.card:nth-child(4)[data-enter] { animation-delay: 0.2s; }
-.card:nth-child(5)[data-enter] { animation-delay: 0.25s; }
-.card:nth-child(6)[data-enter] { animation-delay: 0.3s; }
-.card:nth-child(7)[data-enter] { animation-delay: 0.35s; }
-.card:nth-child(8)[data-enter] { animation-delay: 0.4s; }
-.card:nth-child(9)[data-enter] { animation-delay: 0.45s; }
-.card:nth-child(10)[data-enter] { animation-delay: 0.5s; }
-
 @keyframes probeFadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* The status dot swells slightly under the pointer, like Mikus. */
-.card:hover .dot { transform: scale(1.2); }
-
-.card:active { transform: scale(0.98); transition: transform 0.1s ease; }
 
 /* ==========================================================================
    Latency page
@@ -2700,7 +1603,6 @@
   color: var(--probe-text-tertiary);
 }
 
-
 /* ==========================================================================
    Responsive rules.
 
@@ -2711,15 +1613,12 @@
    predictable.
    ========================================================================== */
 @media (max-width: 900px) {
-  .welcome { padding: 20px 20px 18px; }
   .welcomeGreeting { padding-left: 78px; gap: 12px; }
-  .greetingMascot { width: 150px; height: 150px; top: -70px; left: -50px; }
   .greetingText { font-size: 1.35rem; }
   .timeValue { font-size: 1.4rem; }
 }
 
 @media (max-width: 900px) {
-  .topSearch { max-width: 180px; }
 }
 
 @media (max-width: 768px) {
@@ -2728,45 +1627,19 @@
     gap: 12px;
   }
 
-  .title { font-size: 1.25rem; }
-
   .grid {
     grid-template-columns: 1fr;
     gap: 14px;
     min-width: 0;
   }
 
-  .card {
-    padding: 16px;
-    border-radius: var(--probe-r-md);
-  }
-
   /* Touch: the hover lift is meaningless, so settle the shadow back down. */
-  .card:hover,
-  .card:active {
+  .card:hover{
     transform: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     border-color: var(--probe-border);
   }
-
-  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tile[data-wide] { grid-column: 1 / -1; }
-
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .stat { padding: 8px 12px; }
-
-  .statValue { font-size: 1.05rem; }
-
-  .listBar { gap: 8px; }
-
-  .searchWrap { flex: 1 1 100%; }
-
-  .filterPills,
   .rangePills {
     flex: 1 1 auto;
     overflow-x: auto;
@@ -2781,12 +1654,6 @@
     overflow-x: auto;
     scrollbar-width: none;
   }
-
-  .tabs::-webkit-scrollbar { display: none; }
-
-  .tab { flex: none; }
-
-  .filterPills::-webkit-scrollbar,
   .rangePills::-webkit-scrollbar { display: none; }
 
   .modal {
@@ -2804,12 +1671,8 @@
 
   .modalFooter > button { flex: 1 1 auto; }
 
-  .metricGrid { gap: 10px; }
-
   .section,
   .chartCard { padding: 14px 16px; }
-
-  .detailTitle { font-size: 1.15rem; }
 
   .queryState,
   .quietState {
@@ -2840,18 +1703,8 @@
   .topbarActions .ghostButton { display: none; }
   .topbarActions .iconButton { width: 34px; height: 34px; }
 
-  /* Room for the mascot above the band; without it the figure lands on the
-     header. Upstream uses 40px at this breakpoint. */
-  .welcome {
-    margin-top: 44px;
-    padding: 14px;
-    border-radius: var(--probe-r-md);
-    min-width: 0;
-  }
-
   /* Upstream hides the petals and glow discs below 768px, matching the band. */
-  .sakuraPetal,
-  .decoCircle { display: none; }
+  .sakuraPetal{ display: none; }
 
   /* A phone cannot hold the greeting and the clock side by side: the greeting
      column collapses to about 70px and wraps to two lines. Stack them instead,
@@ -2862,47 +1715,6 @@
     gap: 8px;
     min-width: 0;
   }
-
-  .welcomeGreeting {
-    padding-left: 82px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    flex: none;
-    min-width: 0;
-    width: 100%;
-  }
-
-  .greetingMascot {
-    width: 74px;
-    height: 74px;
-    top: -42px;
-    left: -4px;
-  }
-
-  .greetingText { font-size: 1.2rem; }
-  .greetingSubtitle { font-size: 0.75rem; }
-
-  .welcomeTime {
-    align-items: flex-start;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .timeLabel { font-size: 0.75rem; }
-  .timeValue { font-size: 1.35rem; }
-  .trafficText { font-size: 0.68rem; }
-
-  .stats { gap: 8px; }
-
-  .stat {
-    flex: 1 1 auto;
-    justify-content: space-between;
-    padding: 9px 14px;
-  }
-
-  .statLabel { font-size: 0.75rem; }
-  .statValue { font-size: 1rem; }
 }
 
 @media (max-width: 640px) {
@@ -2915,7 +1727,6 @@
 }
 
 @media (max-width: 640px) {
-  .topSearch { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -2925,35 +1736,21 @@
 }
 
 @media (max-width: 480px) {
-  .card { padding: 12px; }
-  .metricGrid { gap: 10px; }
   .gaugeLabel { font-size: 0.62rem; letter-spacing: 0.04em; }
   .gaugeValue { font-size: 0.78rem; }
-  .stats { grid-template-columns: 1fr; }
-  .tab { padding: 7px 12px; font-size: 0.76rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dot,
   .alertRow[data-active] .alertDot,
   .skeletonLine { animation: none; }
-  .card,
-  .stat,
   .tile { transition: none; }
-  .card:hover { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .welcome { animation: none; }
-  .sakuraPetal,
-  .decoCircle,
-  .greetingMascot { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card[data-enter] { animation: none; opacity: 1; }
-  .card:active { transform: none; }
-  .card:hover .dot { transform: none; }
 }
 
 /* ==========================================================================
@@ -2990,16 +1787,9 @@
     height: auto;
     align-self: start;
   }
-
-  .cardFoot { gap: 8px 10px; }
 }
 
 @media (max-width: 640px) {
-  /* Three summary figures into two columns leaves a half-empty row; let an odd
-     last card take the full width so the strip reads as a deliberate grid. */
-  .stats > .stat:nth-child(odd):last-child {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 640px) {
@@ -3214,4 +2004,46 @@
   .adminMenu { display: inline-flex; }
   .adminBody { position: relative; }
   .adminContent { padding: 12px; }
+}
+
+/* ==========================================================================
+   Console / latency surfaces.
+
+   These four were referenced by the console and latency sections but never
+   defined, so those elements rendered with no styling at all: the latency page
+   lost its padding, the numeric columns lost their monospace alignment, and the
+   loss badge had no pill shape.
+   ========================================================================== */
+
+.tabBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mono {
+  font-family: var(--probe-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.76rem;
+  color: var(--probe-text-secondary);
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  border-radius: 4px;
+  color: var(--probe-text-secondary);
+  background: var(--probe-bg-tertiary);
+  white-space: nowrap;
+}
+
+.formError {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--probe-danger);
 }
