@@ -147,30 +147,95 @@ function NodeCard({ host, onOpen }: { host: ProbeHost; onOpen: () => void }) {
   )
 }
 
-/** One row of the table view, mirroring the upstream table renderer. */
-function NodeRow({ host }: { host: ProbeHost }) {
+/**
+ * One card of the table view, mirroring upstream `renderTableCard`.
+ *
+ * Upstream's "table" is a compact card list (`.table-cards > .table-card`), not
+ * a `<table>`: a header with status, flag and name, then a metric strip with a
+ * bar per percentage, then the tag row.
+ */
+function TableCard({ host, onOpen }: { host: ProbeHost; onOpen: () => void }) {
   const current = host.current
+  const isOnline = host.status === 'online'
   const os = current === null ? null : formatOs(current.os)
+  const tags = host.tags.slice(0, 3).map(parseTag)
+
+  /** One percentage metric with its bar. */
+  const metric = (label: string, value: number | undefined): React.ReactElement => {
+    const level = levelFor(value)
+    return (
+      <div className="table-card-metric">
+        <span className="table-card-metric-label">{label}</span>
+        <span className={`table-card-metric-value level-${level}`}>{percent(value)}</span>
+        <div className="table-card-metric-bar">
+          <div
+            className={`table-card-metric-fill level-${level}`}
+            style={{ width: `${value === undefined ? 0 : Math.min(100, Math.max(0, value))}%` }}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <tr data-status={host.status}>
-      <td>
-        <span className="node-card-name">
-          <span className={`node-status-dot${host.status === 'online' ? '' : ' offline'}`} />
-          <span className="node-name-text">{host.name}</span>
-        </span>
-      </td>
-      <td>
-        <span className="node-card-os">
-          <span className={`os-icon os-icon-${os?.icon ?? 'unknown'}`} />
-          {os?.name ?? '-'}
-        </span>
-      </td>
-      <td>{percent(current?.cpu)}</td>
-      <td>{percent(current?.memPct)}</td>
-      <td>{percent(current?.diskPct)}</td>
-      <td>{rate(current?.rxRate)} / {rate(current?.txRate)}</td>
-      <td>{formatUptime(current?.uptime)}</td>
-    </tr>
+    <div
+      className={`table-card${isOnline ? '' : ' offline'}`}
+      data-status={host.status}
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen() } }}
+      style={{ cursor: 'pointer' }}
+    >
+      <div className="table-card-header">
+        <div className="table-card-name-wrap">
+          <span className={`table-card-status${isOnline ? '' : ' offline'}`} />
+          <span className="table-card-flag-wrap">
+            {hasFlag(host.regionCode) && (
+              <span
+                className="table-card-flag"
+                title={host.regionName}
+                style={{ backgroundImage: `url("${flagUrl(host.regionCode)}")` }}
+              />
+            )}
+          </span>
+          <span className="table-card-name">{host.name}</span>
+        </div>
+        <div className="table-card-info">
+          <span className="table-card-price">{host.regionName !== '' ? host.regionName : ''}</span>
+        </div>
+      </div>
+
+      <div className="table-card-metrics">
+        <div className="table-card-metric table-card-system">
+          <span className="table-card-metric-label">{tt('table.os')}</span>
+          <span className="table-card-metric-value">
+            <span className={`os-icon os-icon-${os?.icon ?? 'unknown'}`} />
+            {os?.name ?? '-'}
+          </span>
+        </div>
+        {metric('CPU', current?.cpu)}
+        {metric('RAM', current?.memPct)}
+        {metric(tt('card.disk'), current?.diskPct)}
+        <div className="table-card-metric">
+          <span className="table-card-metric-label">{tt('card.upload')}</span>
+          <span className="table-card-metric-value">{rate(current?.txRate)}</span>
+        </div>
+        <div className="table-card-metric">
+          <span className="table-card-metric-label">{tt('card.download')}</span>
+          <span className="table-card-metric-value">{rate(current?.rxRate)}</span>
+        </div>
+        {tags.length > 0 && (
+          <div className="table-card-metric table-card-metric-tags">
+            <div className="table-card-tags">
+              {tags.map(tag => (
+                <span key={tag.text} className={`table-card-tag${tag.className}`}>{tag.text}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -364,25 +429,12 @@ export function MonitorPage({ snapshot, handlers }: { snapshot: ProbeSnapshot; h
           )
           : (
             <div className="nodes-table-container">
-              <div className="table-card">
-                <table className="nodes-table">
-                  <thead>
-                    <tr>
-                      <th>{tt('table.name')}</th>
-                      <th>{tt('table.os')}</th>
-                      <th>CPU</th>
-                      <th>RAM</th>
-                      <th>{tt('card.disk')}</th>
-                      <th>{tt('table.net')}</th>
-                      <th>{tt('card.uptime')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map(host => (
-                      <NodeRow key={host.id} host={host} />
-                    ))}
-                  </tbody>
-                </table>
+              <div id="nodesTableBody">
+                <div className="table-cards">
+                  {visible.map(host => (
+                    <TableCard key={host.id} host={host} onOpen={() => { handlers.onOpenHost(host.id) }} />
+                  ))}
+                </div>
               </div>
             </div>
           )}

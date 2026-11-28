@@ -1,0 +1,25 @@
+/*
+ * Deviations from the upstream theme.
+ *
+ * This layer is NOT part of the Komari Mikus repository: it holds only the rules
+ * the panel needs to work inside a narrower container than the theme was written
+ * for. Keep it short — anything else belongs upstream.
+ */
+
+/* Upstream sizes `.table-cards` at `minmax(480px, 1fr)` with no phone rule, so a
+   card is wider than a 457px viewport and the wall scrolls sideways. One column
+   keeps the same card shape without the overflow. */
+@media (max-width: 640px) {
+    .table-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .table-card-metrics {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .table-card-metric-tags {
+        grid-column: 1 / -1;
+    }
+}

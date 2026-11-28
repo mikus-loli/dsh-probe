@@ -111,6 +111,8 @@ function themeCssPlugin(scope) {
 const THEME_FILES = [
   'base', 'header', 'welcome', 'stats', 'nodes-grid', 'nodes', 'nodes-table',
   'modal-base', 'modal-info', 'modal-charts', 'modal-latency', 'modal', 'footer',
+  // Our own deviations, applied last so they win over the copied rules.
+  'overrides',
 ]
 
 /**
