@@ -8,13 +8,14 @@
  * no canvas chart module; they use the theme's own colour variables so the
  * palette still matches.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ProbeApi, ProbeHistory, ProbeHost } from '../api'
 import type { ProbeKey } from '../locales'
 import { bytes, durationShort, load, percent, rate } from './format'
 import { formatOs } from './os-icon'
 import { flagUrl, hasFlag } from './flag'
 import { tt } from './helpers'
+import { drawLineChart, nearestSample, tooltipText, type ChartRecord } from './themeCharts'
 
 /** Ranges the time control offers, matching the upstream buttons. */
 const RANGES: Array<{ key: '1h' | '24h' | '7d'; label: string }> = [
@@ -33,33 +34,74 @@ function InfoItem({ label, value, nowrap }: { label: string; value: string; nowr
   )
 }
 
-/** One chart section with an inline SVG trend. */
-function ChartSection({ title, values, colour, ceiling }: { title: string; values: number[]; colour: string; ceiling?: number }) {
-  const points = useMemo(() => {
-    if (values.length < 2) return ''
-    // Percentages are measured against 100 so a steady 58% sits mid-scale
-    // instead of pinning to the top of its own local range.
-    const max = ceiling ?? Math.max(...values, 1)
-    const step = 1000 / (values.length - 1)
-    return values.map((value, index) => `${index === 0 ? 'M' : 'L'}${(index * step).toFixed(1)} ${(200 - (Math.min(value, max) / max) * 190).toFixed(1)}`).join(' ')
-  }, [values])
+/**
+ * One chart section: a canvas the upstream renderer draws into.
+ *
+ * The canvas is redrawn whenever the series or the range changes, and on resize
+ * (a phone rotation would otherwise leave a stretched bitmap).
+ */
+function ChartSection({ title, records, colour, suffix, rangeHours }: {
+  title: string
+  records: ChartRecord[]
+  colour: string
+  suffix: string
+  rangeHours: number
+}) {
+  const ref = useRef<HTMLCanvasElement | null>(null)
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
+
+  useEffect(() => {
+    const canvas = ref.current
+    if (canvas === null) return
+    const paint = (): void => {
+      drawLineChart(canvas, records, { min: 0, max: 100, color: colour, suffix, rangeHours })
+    }
+    paint()
+    const observer = new ResizeObserver(paint)
+    observer.observe(canvas)
+    return () => { observer.disconnect() }
+  }, [records, colour, suffix, rangeHours])
 
   return (
     <div className="chart-section">
       <h3>{title}</h3>
-      {points === ''
-        ? <div className="chart-empty">{tt('chart.loading')}</div>
-        : (
-          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" style={{ width: '100%', height: 180 }}>
-            <path d={points} fill="none" stroke={colour} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-          </svg>
+      <div style={{ position: 'relative' }}>
+        <canvas
+          ref={ref}
+          width={600}
+          height={160}
+          onMouseMove={event => {
+            const sample = nearestSample(event.currentTarget, event.clientX)
+            setTip(sample === null ? null : { x: sample.x, y: sample.y, text: tooltipText(sample, suffix, rangeHours) })
+          }}
+          onMouseLeave={() => { setTip(null) }}
+        />
+        {tip !== null && (
+          <div
+            style={{
+              position: 'absolute',
+              left: Math.max(0, tip.x - 40),
+              top: 0,
+              padding: '2px 6px',
+              borderRadius: 6,
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              fontSize: 11,
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            }}
+          >
+            {tip.text}
+          </div>
         )}
+      </div>
     </div>
   )
 }
 
 /** The modal. */
-export function NodeModal({ api, host, onClose }: { api: ProbeApi; host: ProbeHost; onClose: () => void }) {
+export function NodeModal({ api, host, theme, onClose }: { api: ProbeApi; host: ProbeHost; theme: 'light' | 'dark'; onClose: () => void }) {
   const [range, setRange] = useState<'1h' | '24h' | '7d'>('1h')
   const [history, setHistory] = useState<ProbeHistory | null>(null)
   const sample = host.current
@@ -85,12 +127,16 @@ export function NodeModal({ api, host, onClose }: { api: ProbeApi; host: ProbeHo
     }
   }, [onClose])
 
-  const cpu = history?.points.map(point => point.c) ?? []
-  const mem = history?.points.map(point => point.m) ?? []
-  const disk = history?.points.map(point => point.d) ?? []
+  // The theme's chart wants (time, value) pairs; history already carries time.
+  const toRecords = (pick: (point: { t: number; c: number; m: number; d: number }) => number): ChartRecord[] =>
+    (history?.points ?? []).map(point => ({ time: point.t, value: pick(point) }))
+  const cpu = toRecords(point => point.c)
+  const mem = toRecords(point => point.m)
+  const disk = toRecords(point => point.d)
+  const rangeHours = range === '1h' ? 1 : range === '24h' ? 24 : 24 * 7
 
   return (
-    <div className="probe-theme">
+    <div className="probe-theme" data-theme={theme}>
     <div className="modal-overlay active" onClick={onClose}>
       <div className="modal" role="dialog" aria-modal="true" onClick={event => { event.stopPropagation() }}>
         <div className="modal-scroll-indicator" />
@@ -144,9 +190,9 @@ export function NodeModal({ api, host, onClose }: { api: ProbeApi; host: ProbeHo
             </div>
 
             <div className="modal-charts">
-              <ChartSection title={`CPU ${percent(sample?.cpu)}`} values={cpu} colour="var(--accent)" ceiling={100} />
-              <ChartSection title={`${tt('card.mem')} ${percent(sample?.memPct)}`} values={mem} colour="var(--success)" ceiling={100} />
-              <ChartSection title={`${tt('card.disk')} ${percent(sample?.diskPct)}`} values={disk} colour="var(--info)" ceiling={100} />
+              <ChartSection title={`CPU ${percent(sample?.cpu)}`} records={cpu} colour="--accent" suffix="%" rangeHours={rangeHours} />
+              <ChartSection title={`${tt('card.mem')} ${percent(sample?.memPct)}`} records={mem} colour="--success" suffix="%" rangeHours={rangeHours} />
+              <ChartSection title={`${tt('card.disk')} ${percent(sample?.diskPct)}`} records={disk} colour="--info" suffix="%" rangeHours={rangeHours} />
             </div>
 
             <div className="modal-info" style={{ marginTop: 12 }}>

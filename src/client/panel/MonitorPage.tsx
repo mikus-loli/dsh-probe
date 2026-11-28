@@ -25,6 +25,10 @@ export interface MonitorHandlers {
   onRefresh: () => void
   /** Open one host's detail view. */
   onOpenHost: (id: string) => void
+  /** Light or dark, owned by the panel so the detail modal can match. */
+  theme: 'light' | 'dark'
+  /** Flip the theme. */
+  onToggleTheme: () => void
 }
 
 /** Time-of-day greeting, matching the upstream thresholds. */
@@ -176,22 +180,7 @@ export function MonitorPage({ snapshot, handlers }: { snapshot: ProbeSnapshot; h
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState('all')
   const [view, setView] = useState<'grid' | 'table'>('grid')
-  /** Light or dark, mirroring the upstream header's theme toggle. */
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try {
-      const saved = window.localStorage.getItem('dsh-probe-theme')
-      if (saved === 'dark' || saved === 'light') return saved
-    } catch { /* storage may be unavailable; fall through to light */ }
-    return 'light'
-  })
 
-  const flipTheme = (): void => {
-    setTheme(current => {
-      const next = current === 'dark' ? 'light' : 'dark'
-      try { window.localStorage.setItem('dsh-probe-theme', next) } catch { /* ignore */ }
-      return next
-    })
-  }
 
   useEffect(() => {
     const timer = setInterval(() => { setClock(new Date()) }, 1000)
@@ -229,7 +218,7 @@ export function MonitorPage({ snapshot, handlers }: { snapshot: ProbeSnapshot; h
   const offline = snapshot.hosts.length - online
 
   return (
-    <div className="probe-wall probe-theme" data-theme={theme}>
+    <div className="probe-wall probe-theme" data-theme={handlers.theme}>
       <header className="header">
         <div className="header-left">
           <div className="logo">
@@ -279,10 +268,10 @@ export function MonitorPage({ snapshot, handlers }: { snapshot: ProbeSnapshot; h
             <button
               type="button"
               className="theme-toggle"
-              title={theme === 'dark' ? tt('theme.light') : tt('theme.dark')}
-              onClick={flipTheme}
+              title={handlers.theme === 'dark' ? tt('theme.light') : tt('theme.dark')}
+              onClick={handlers.onToggleTheme}
             >
-              {theme === 'dark'
+              {handlers.theme === 'dark'
                 ? (
                   <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" />

@@ -120,6 +120,26 @@ export function ProbePanel({ api }: { api: ProbeApi }) {
    */
   const [page, setPage] = useState<'wall' | 'console'>('wall')
 
+  /**
+   * Light or dark for the wall and the detail modal. Both surfaces mount their
+   * own theme root, so the choice has to live above them.
+   */
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = window.localStorage.getItem('dsh-probe-theme')
+      if (saved === 'dark' || saved === 'light') return saved
+    } catch { /* storage may be blocked; fall back to light */ }
+    return 'light'
+  })
+
+  const toggleTheme = (): void => {
+    setTheme(current => {
+      const next = current === 'dark' ? 'light' : 'dark'
+      try { window.localStorage.setItem('dsh-probe-theme', next) } catch { /* ignore */ }
+      return next
+    })
+  }
+
   /** Which console section is open. */
   const [section, setSection] = useState<'hosts' | 'latency' | 'alerts' | 'settings'>('hosts')
 
@@ -280,6 +300,8 @@ export function ProbePanel({ api }: { api: ProbeApi }) {
           onAdmin: () => { setPage('console') },
           onRefresh: () => void load(false),
           onOpenHost: id => { setSelectedId(id) },
+          theme,
+          onToggleTheme: toggleTheme,
         }}
       />
     )
@@ -289,7 +311,7 @@ export function ProbePanel({ api }: { api: ProbeApi }) {
       {error !== null && <div className={css.errorBar}>{tt('error.load', { message: error })}</div>}
       {snapshot === null ? <LoadingState /> : surface}
       {selected !== undefined && (
-        <NodeModal api={api} host={selected} onClose={() => { setSelectedId(null) }} />
+        <NodeModal api={api} host={selected} theme={theme} onClose={() => { setSelectedId(null) }} />
       )}
       {dialog !== null && dialog.kind === 'install' && (
         <InstallDialog
