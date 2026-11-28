@@ -22,10 +22,11 @@
  */
 
 import { readFileSync, statfsSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
+import { promises as fs } from 'node:fs'
 import os from 'node:os'
 
-const VERSION = '0.3.0'
+const VERSION = '0.4.0'
 
 /**
  * Human-readable distro name from /etc/os-release. `os.type()` only ever says
@@ -252,6 +253,169 @@ if (server === '' || token === '') {
   process.exit(2)
 }
 
+/* -------------------------------------------------------------------------- */
+/* Latency probes                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Run one probe with the system tool for its kind.
+ *
+ * `icmp` uses ping and parses the `time=… ms` field; `tcp` measures only the
+ * connect handshake with curl's `time_connect`; `http` takes curl's
+ * `time_total`. A non-zero exit or an unparsable output is a loss, reported as
+ * `null` so the server can tell a timeout from a zero-millisecond reply.
+ * @param {{type: string, target: string}} task - the queued probe.
+ * @returns {Promise<number|null>} round-trip milliseconds, or null on loss.
+ */
+function probe(task) {
+  return new Promise(resolve => {
+    const done = (value) => { resolve(value) }
+    try {
+      if (task.type === 'icmp') {
+        execFile('ping', ['-c', '1', '-W', '2', task.target], { timeout: 5000 }, (error, stdout) => {
+          if (error) return done(null)
+          const match = /time=([\d.]+)\s*ms/.exec(String(stdout))
+          return done(match === null ? null : Math.round(Number(match[1]) * 100) / 100)
+        })
+        return
+      }
+      if (task.type === 'tcp') {
+        const [host, port] = task.target.includes(':')
+          ? [task.target.slice(0, task.target.lastIndexOf(':')), task.target.slice(task.target.lastIndexOf(':') + 1)]
+          : [task.target, '80']
+        execFile('curl', ['-sS', '-o', '/dev/null', '--max-time', '3', '-w', '%{time_connect}', `telnet://${host}:${port}`],
+          { timeout: 5000 }, (error, stdout) => {
+            if (error) return done(null)
+            const seconds = Number(String(stdout).trim())
+            return done(Number.isFinite(seconds) ? Math.round(seconds * 1000) : null)
+          })
+        return
+      }
+      if (task.type === 'http') {
+        execFile('curl', ['-sS', '-o', '/dev/null', '--max-time', '5', '-w', '%{time_total}', task.target],
+          { timeout: 7000 }, (error, stdout) => {
+            if (error) return done(null)
+            const seconds = Number(String(stdout).trim())
+            return done(Number.isFinite(seconds) ? Math.round(seconds * 1000) : null)
+          })
+        return
+      }
+      done(null)
+    } catch {
+      done(null)
+    }
+  })
+}
+
+/**
+ * Replace this script with the version the panel serves, then re-exec.
+ *
+ * The panel only queues an `agent.switchVersion` event; the actual swap is the
+ * agent's job because it already knows where it reports to. The download is
+ * verified (the new script must report the expected version through
+ * `--version`) before it is moved into place, so a truncated transfer can never
+ * become the running agent. The move is a same-directory rename, hence atomic.
+ * @param {string} version - version the panel expects.
+ * @param {string} nodePath - path of the .mjs source, relative to the server.
+ * @returns {Promise<boolean>} whether the upgrade happened (true means re-exec).
+ */
+async function upgradeSelf(version, nodePath) {
+  if (typeof version !== 'string' || version === '' || version === VERSION) return false
+  const target = process.argv[1]
+  if (typeof target !== 'string' || target === '') return false
+  const url = `${server}/${String(nodePath ?? '').replace(/^\//, '')}`
+  // Node decides how to load a file by its extension, so the temp copy must
+  // keep `.mjs` at the end; a `.new.<pid>` suffix would be an unknown type.
+  const temp = `${target}.new-${process.pid}.mjs`
+  console.log(`[dsh-probe-agent] upgrading ${VERSION} -> ${version}`)
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const body = await response.text()
+    if (!body.includes('dsh-probe-agent')) throw new Error('downloaded file is not an agent')
+    await fs.writeFile(temp, body, { mode: 0o755 })
+    // Verify the download really is the advertised build before replacing.
+    const reported = execFileSync(process.execPath, [temp, '--version'], { encoding: 'utf8', timeout: 15_000 }).trim()
+    if (!reported.endsWith(version)) throw new Error(`downloaded version is "${reported}", expected ${version}`)
+    await fs.rename(temp, target)
+    console.log(`[dsh-probe-agent] upgraded to ${version}; restarting`)
+    // Carry the original argv so the supervisor sees the same command again.
+    execFileSync(process.execPath, [target, ...process.argv.slice(2)], { stdio: 'inherit' })
+    process.exit(0)
+  } catch (error) {
+    await fs.rm(temp, { force: true }).catch(() => {})
+    console.error(`[dsh-probe-agent] upgrade failed: ${error instanceof Error ? error.message : String(error)}`)
+    return false
+  }
+}
+
+/** Results carried to the next report, and the ids the server may drop. */
+let pendingPings = []
+let pendingAcks = []
+
+/**
+ * Run every probe the server queued on the last response.
+ * @param {Array<{id: string, method: string, params: object}>} events
+ * @returns {Promise<void>}
+ */
+async function runEvents(events) {
+  const pings = []
+  const acks = []
+  for (const event of events) {
+    if (event === null || typeof event !== 'object') continue
+    // A version switch ends this process: the replacement re-execs in place.
+    if (event.method === 'agent.switchVersion') {
+      const ok = await upgradeSelf(event.params?.version, event.params?.node)
+      if (ok) process.exit(0)
+      continue
+    }
+    if (event.method !== 'agent.ping') continue
+    const params = event.params ?? {}
+    if (typeof params.taskId !== 'string' || typeof params.target !== 'string') continue
+    const ms = await probe({ type: params.type, target: params.target })
+    pings.push({ taskId: params.taskId, ms })
+    if (typeof event.id === 'string') acks.push(event.id)
+  }
+  if (pings.length > 0) {
+    pendingPings = pings
+    pendingAcks = acks
+    console.log(`[dsh-probe-agent] ran ${pings.length} probe(s)`)
+  }
+}
+
+/** Egress address of this machine, resolved once. */
+let publicIpPromise
+
+/**
+ * Ask for this machine's public IPv4.
+ *
+ * The panel locates a host by address, and an agent reporting to localhost has
+ * a loopback source that carries no geography — so the agent reports its own
+ * egress address, exactly like Komari's basicInfo does.
+ * @returns {Promise<string>} the address, or an empty string when unavailable.
+ */
+async function publicIp() {
+  if (typeof process.env.DSPROBE_PUBLIC_IP === 'string' && process.env.DSPROBE_PUBLIC_IP !== '') {
+    return process.env.DSPROBE_PUBLIC_IP.trim()
+  }
+  if (publicIpPromise === undefined) {
+    publicIpPromise = (async () => {
+      for (const url of ['https://api.ipify.org', 'https://ifconfig.me/ip', 'https://ipinfo.io/ip']) {
+        try {
+          const response = await fetch(url, { signal: AbortSignal.timeout(4000) })
+          if (!response.ok) continue
+          const text = (await response.text()).trim()
+          if (/^\d{1,3}(\.\d{1,3}){3}$/.test(text)) return text
+        } catch {
+          // Try the next endpoint; a failure must not cost a lookup per report.
+        }
+      }
+      return ''
+    })()
+  }
+  return publicIpPromise
+}
+
 const endpoint = `${server}/auth/dsh-probe/ingest`
 let sent = 0
 let failures = 0
@@ -260,7 +424,13 @@ let timer
 
 /** POST one report; a failure never exits the agent. */
 async function report() {
-  const body = sample()
+  // Probe results measured since the previous report ride this one, together
+  // with the ids the server can drop: it is the only downstream channel a
+  // dial-out agent has (the same contract Komari's POST fallback uses).
+  const body = { ...sample(), pings: pendingPings, ackEventIds: pendingAcks }
+  const ip = await publicIp()
+  if (ip !== '') body.ip = ip
+  const delivered = { pings: pendingPings.length, acks: pendingAcks.length }
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -276,6 +446,21 @@ async function report() {
       const text = await response.text().catch(() => '')
       throw new Error(`HTTP ${response.status} ${text.slice(0, 200)}`)
     }
+    // The report was accepted, so what it carried is now the server's problem;
+    // anything queued in the response becomes this cycle's work.
+    if (delivered.pings > 0 || delivered.acks > 0) {
+      pendingPings = []
+      pendingAcks = []
+    }
+    let payload = null
+    try {
+      payload = await response.json()
+    } catch {
+      payload = null
+    }
+    const events = Array.isArray(payload?.events) ? payload.events : []
+    if (events.length > 0) await runEvents(events)
+
     sent += 1
     if (sent === 1) {
       console.log(`[dsh-probe-agent] reporting ${displayName} -> ${endpoint} every ${intervalSec}s`)

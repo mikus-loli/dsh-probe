@@ -1,7 +1,7 @@
 {
   "name": "@local/dsh-probe",
   "description": "Komari-style server probe inside the dsh web GUI: a lightweight Linux agent pushes CPU / memory / disk / load / network metrics, the Probe panel shows live host cards and 1h-7d trends, threshold alerts fire, and the agent can read the same data with probe_* tools.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "icon": "icon.svg",
@@ -33,7 +33,8 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/dsh-tools": "0.2.2-rc.5"
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5",
+    "maxmind": "^5.1.0"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.2-rc.3",

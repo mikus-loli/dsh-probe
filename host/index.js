@@ -89,6 +89,13 @@ export function apply(ctx, config) {
   })
   const service = new ProbeService({ store, metrics, alerts, notifier, version: PANEL_VERSION, agentVersion: AGENT_VERSION })
 
+  // Resolve the region provider before the first report can land: the offline
+  // database is preferred, and a missing one simply falls back to a network
+  // provider. Failure here must not stop the panel from mounting.
+  void service.initGeo().catch(error => {
+    console.warn('[dsh-probe] geo provider unavailable:', error instanceof Error ? error.message : String(error))
+  })
+
   // The connection bridge resolves authentication through its calling fiber;
   // capture it in a scope that injects both halves before routes use it.
   const connection = captureConnection(ctx, 'dsh-probe: connection trust')
@@ -101,6 +108,7 @@ export function apply(ctx, config) {
     connection,
     agentPath: join(here, '..', 'agent', 'agent.mjs'),
     shellAgentPath: join(here, '..', 'agent', 'agent.sh'),
+    flagDir: join(here, '..', 'assets', 'flags'),
   })
   const tools = probeTools(service)
 

@@ -19,6 +19,143 @@ const PLUGIN_ID = pkg.name
 const CSS_PREFIX = 'probe'
 const CSS_TAG_ID = `${PLUGIN_ID}/panel.css`
 
+/**
+ * Scope one stylesheet under a root selector.
+ *
+ * The theme this plugin copies is authored as a standalone page: it styles
+ * `:root`, `body`, `html` and uses bare class names. Injecting it as-is would
+ * repaint the whole GUI, so every rule is re-rooted under the panel's own
+ * element. `@media` blocks are walked recursively, and keyframes are renamed
+ * with the same prefix so they cannot collide with the shell's animations.
+ * @param {string} css - the stylesheet source.
+ * @param {string} scope - selector every rule is nested under.
+ * @returns {string} the scoped stylesheet.
+ */
+function scopeStylesheet(css, scope) {
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const keyframes = new Set()
+
+  /** Walk one block, rewriting rules and recursing into at-rules. */
+  const walk = (text) => {
+    let out = ''
+    let index = 0
+    while (index < text.length) {
+      const brace = text.indexOf('{', index)
+      if (brace < 0) { out += text.slice(index); break }
+      const prelude = text.slice(index, brace).trim()
+      let depth = 0
+      let end = brace
+      for (; end < text.length; end += 1) {
+        if (text[end] === '{') depth += 1
+        else if (text[end] === '}') { depth -= 1; if (depth === 0) break }
+      }
+      const body = text.slice(brace + 1, end)
+
+      if (/^@(media|supports|layer|container)\b/.test(prelude)) {
+        out += `${prelude}{${walk(body)}}`
+      } else if (/^@(-webkit-)?keyframes\b/.test(prelude)) {
+        const name = prelude.replace(/^@(-webkit-)?keyframes\s+/, '').trim()
+        keyframes.add(name)
+        out += `@keyframes ${CSS_PREFIX}_${name}{${body}}`
+      } else if (/^@(font-face|import|charset|namespace)\b/.test(prelude)) {
+        out += prelude === '@charset "UTF-8"' ? '' : `${prelude}{${body}}`
+      } else {
+        const scoped = prelude.split(',').map((raw) => {
+          const sel = raw.trim()
+          if (sel === '') return ''
+          // The theme's own theme switch rides the root element, so an
+          // attribute selector chains onto the scope without a descendant gap.
+          if (sel.startsWith('[data-theme')) return scope + sel
+          if (/^(html|body)(\b|::|:)/.test(sel)) return sel.replace(/^(html|body)/, scope)
+          if (sel === ':root') return scope
+          if (sel.startsWith('*')) return `${scope} ${sel}`
+          if (sel.startsWith(scope)) return sel
+          return `${scope} ${sel}`
+        }).filter(Boolean).join(',')
+        out += `${scoped}{${body}}`
+      }
+      index = end + 1
+    }
+    return out
+  }
+
+  const scoped = walk(withoutComments)
+  // Rewrite `animation` / `animation-name` values to the renamed frames. The
+  // whole declaration value is matched first, then the name inside it is
+  // replaced: matching the name directly after a greedy `[^;}]*` never fires.
+  return scoped.replace(/(animation(?:-name)?\s*:\s*)([^;}]+)/g, (whole, head, value) => {
+    let next = value
+    for (const name of keyframes) {
+      next = next.replace(new RegExp(`(^|[\\s,])${name}(?=[\\s,]|$)`, 'g'), `$1${CSS_PREFIX}_${name}`)
+    }
+    return head + next
+  })
+}
+
+/** Load a raw theme stylesheet as a JS module exporting the scoped CSS text. */
+function themeCssPlugin(scope) {
+  return {
+    name: 'dsh-theme-css',
+    setup(b) {
+      b.onResolve({ filter: /\.raw\.css$/ }, args => ({ path: resolve(args.resolveDir, args.path), namespace: 'theme-css' }))
+      b.onLoad({ filter: /.*/, namespace: 'theme-css' }, async args => {
+        const source = await readFile(args.path, 'utf8')
+        const scoped = scopeStylesheet(source, scope)
+        return { contents: `export default ${JSON.stringify(scoped)};`, loader: 'js', resolveDir: dirname(args.path), watchFiles: [args.path] }
+      })
+    },
+  }
+}
+
+/** Theme layers, in the order the upstream page loads them. */
+const THEME_FILES = [
+  'base', 'header', 'welcome', 'stats', 'nodes-grid', 'nodes', 'nodes-table',
+  'modal-base', 'modal-info', 'modal-charts', 'modal-latency', 'modal', 'footer',
+]
+
+/**
+ * Bundle every theme stylesheet into one scoped module.
+ *
+ * Scoping happens over the concatenation rather than file by file, because
+ * `@keyframes` live in `base.css` while `animation:` references sit in the modal
+ * files: renaming them per file would leave every reference pointing at a frame
+ * that no longer exists (which is exactly how the modal ended up invisible).
+ */
+function themeBundlePlugin(scope) {
+  return {
+    name: 'dsh-theme-bundle',
+    setup(b) {
+      b.onResolve({ filter: /^virtual:mikus-theme$/ }, () => ({ path: 'mikus-theme', namespace: 'theme-bundle' }))
+      b.onLoad({ filter: /.*/, namespace: 'theme-bundle' }, async () => {
+        const dir = resolve(root, 'src/client/theme/raw')
+        const parts = []
+        for (const name of THEME_FILES) {
+          const file = resolve(dir, `${name}.raw.css`)
+          parts.push(`/* ${name}.css */\n${await readFile(file, 'utf8')}`)
+        }
+        const scoped = scopeStylesheet(parts.join('\n'), scope)
+        return { contents: `export default ${JSON.stringify(scoped)};`, loader: 'js', resolveDir: dir }
+      })
+    },
+  }
+}
+
+/** Inline a small binary asset as a data URI, keeping the bundle self-contained. */
+function assetPlugin() {
+  return {
+    name: 'dsh-asset',
+    setup(b) {
+      b.onLoad({ filter: /\.(webp|png|jpe?g|gif|svg)$/, namespace: 'file' }, async args => {
+        if (!args.path.includes('/theme/')) return undefined
+        const data = await readFile(args.path)
+        const ext = args.path.slice(args.path.lastIndexOf('.') + 1).toLowerCase()
+        const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+        return { contents: `export default ${JSON.stringify(`data:${mime};base64,${data.toString('base64')}`)};`, loader: 'js' }
+      })
+    },
+  }
+}
+
 /** Render one CSS-module import to a JS module: prefixed classes + one style tag. */
 function cssModulePlugin() {
   return {
@@ -66,7 +203,7 @@ const result = await build({
   legalComments: 'none',
   minify: false,
   logLevel: 'info',
-  plugins: [cssModulePlugin()],
+  plugins: [cssModulePlugin(), themeBundlePlugin('[data-dsh-probe-view] .probe-theme'), assetPlugin()],
 })
 
 const jsOutput = result.outputFiles.find(file => file.path.endsWith('.js')) ?? result.outputFiles[0]

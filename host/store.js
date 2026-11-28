@@ -28,6 +28,12 @@ export const DEFAULT_SETTINGS = {
   },
   /** Days of one-minute history kept per host. */
   retentionDays: 7,
+  /**
+   * Region lookup provider. `mmdb` reads the offline GeoLite2 database;
+   * `ip-api` / `geojs` / `ipinfo` fall back to a network service. Empty means
+   * "choose automatically" (offline database when downloaded, else a remote).
+   */
+  geoProvider: '',
   /** Reporting cadence written into the install commands. */
   reportIntervalSec: 3,
   /** Optional webhook that receives alert open/close events. */
@@ -141,6 +147,8 @@ export class ProbeStore {
       if (!Array.isArray(host.tags)) host.tags = []
       host.enabled = host.enabled !== false
       if (!Number.isFinite(host.mutedUntil)) host.mutedUntil = 0
+      if (typeof host.regionCode !== 'string') host.regionCode = ''
+      if (typeof host.regionName !== 'string') host.regionName = ''
     }
     if (!this.foreignSchema && existsSync(this.hostsFile) && hostsVersion < SCHEMA_VERSION) {
       backupFile(this.hostsFile)
@@ -161,6 +169,9 @@ export class ProbeStore {
     const merged = structuredClone(DEFAULT_SETTINGS)
     if (raw !== null && typeof raw === 'object') {
       if (Number.isFinite(raw.retentionDays)) merged.retentionDays = clamp(Math.round(raw.retentionDays), 1, 30)
+      if (typeof raw.geoProvider === 'string' && ['', 'mmdb', 'ip-api', 'geojs', 'ipinfo', 'none'].includes(raw.geoProvider)) {
+        merged.geoProvider = raw.geoProvider
+      }
       if (Number.isFinite(raw.reportIntervalSec)) merged.reportIntervalSec = clamp(Math.round(raw.reportIntervalSec), 1, 60)
       for (const key of RULE_KEYS) {
         const rule = raw?.rules?.[key]
@@ -193,6 +204,9 @@ export class ProbeStore {
     if (patch !== null && typeof patch === 'object') {
       if (Number.isFinite(patch.retentionDays)) next.retentionDays = clamp(Math.round(patch.retentionDays), 1, 30)
       if (Number.isFinite(patch.reportIntervalSec)) next.reportIntervalSec = clamp(Math.round(patch.reportIntervalSec), 1, 60)
+      if (typeof patch.geoProvider === 'string' && ['', 'mmdb', 'ip-api', 'geojs', 'ipinfo', 'none'].includes(patch.geoProvider)) {
+        next.geoProvider = patch.geoProvider
+      }
       if (patch.rules !== null && typeof patch.rules === 'object') {
         for (const key of RULE_KEYS) {
           const rule = patch.rules[key]
@@ -261,6 +275,46 @@ export class ProbeStore {
     this.hosts.push(host)
     this.#saveHosts()
     return { ...host }
+  }
+
+  /** Latency tasks, read from disk on first use. */
+  getPingTasks() {
+    if (this.pingTasks !== undefined) return this.pingTasks
+    const file = join(this.root, 'pings.json')
+    const document = readJson(file, { version: SCHEMA_VERSION, tasks: [] })
+    const tasks = Array.isArray(document?.tasks) ? document.tasks : []
+    this.pingTasks = tasks.filter(task => task !== null && typeof task === 'object' && typeof task.id === 'string')
+    return this.pingTasks
+  }
+
+  /** Persist the latency task list. */
+  savePingTasks(tasks) {
+    if (this.foreignSchema) return
+    this.pingTasks = tasks
+    writeJson(join(this.root, 'pings.json'), { version: SCHEMA_VERSION, tasks })
+  }
+
+  /**
+   * Store the auto-detected region on a host.
+   *
+   * Separate from `update` because the ingest path writes it, not the operator:
+   * a manual `location` note stays intact, and this only records what the source
+   * address lookup concluded.
+   * @param {string} id - host id.
+   * @param {{code: string, name: string}} region - resolved region.
+   * @returns {object|undefined} the updated host, or undefined when unknown.
+   */
+  setRegion(id, region) {
+    const host = this.hosts.find(candidate => candidate.id === id)
+    if (host === undefined || this.foreignSchema) return undefined
+    const code = String(region?.code ?? '').toLowerCase().slice(0, 2)
+    const name = String(region?.name ?? '').slice(0, 60)
+    if (code === '' || (host.regionCode === code && host.regionName === name)) return host
+    host.regionCode = code
+    host.regionName = name
+    host.updatedAt = Date.now()
+    this.#saveHosts()
+    return host
   }
 
   /**

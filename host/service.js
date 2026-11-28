@@ -8,6 +8,18 @@
  */
 
 import { normalizeReport } from './metrics.js'
+import { dropHost as dropEvents, enqueue as enqueueEvent, take as takeEvents } from './events.js'
+import { PingStore, dispatchDue, normalizeTask } from './pingtasks.js'
+import {
+  cachedRegion,
+  clearPending,
+  createProvider,
+  databaseStatus,
+  downloadDatabase,
+  isPublicAddress,
+  lookupRegion,
+  markPending,
+} from './geo.js'
 
 /**
  * Compare two dotted versions by their numeric segments.
@@ -67,6 +79,12 @@ export class ProbeService {
     this.agentVersion = options.agentVersion ?? this.version
     /** @type {Map<string, number>} last accepted report per host */
     this.lastReport = new Map()
+    /** Active region provider; resolved lazily by initGeo(). */
+    this.geoProvider = undefined
+    /** Latency task results and dispatch bookkeeping. */
+    this.pingStore = new PingStore()
+    /** @type {PingTask[]} configured latency tasks */
+    this.pingTasks = this.store.getPingTasks()
   }
 
   /** Settings, kept as the single source for thresholds and retention. */
@@ -112,6 +130,9 @@ export class ProbeService {
       token: host.token,
       tags: [...host.tags],
       location: host.location ?? '',
+      // Auto-detected from the report source address (never typed by hand).
+      regionCode: host.regionCode ?? '',
+      regionName: host.regionName ?? '',
       note: host.note ?? '',
       enabled: host.enabled,
       createdAt: host.createdAt,
@@ -222,7 +243,7 @@ export class ProbeService {
    * @returns the reporting host name.
    * @throws {ProbeError} for an unknown token, a disabled host, or an unusable payload.
    */
-  ingest(token, body) {
+  ingest(token, body, sourceAddress) {
     const host = this.store.findByToken(token)
     if (host === undefined) throw new ProbeError('unknown agent token', 401)
     if (!host.enabled) throw new ProbeError('host is disabled', 403)
@@ -233,9 +254,198 @@ export class ProbeService {
     if (sample === undefined) throw new ProbeError('report carries no usable metrics', 400)
     this.lastReport.set(host.id, now)
     this.metrics.ingest(host.id, sample)
+    // Locate the host from the address the report arrived on, once. The agent
+    // reports every few seconds, so the lookup is cached per address and the
+    // result is written back onto the host record; the panel reads it from there.
+    if (typeof sourceAddress === 'string') this.#locateHost(host, sourceAddress)
     // A muted host still records metrics; it just must not raise alerts.
     if ((host.mutedUntil ?? 0) <= now) this.alerts.evaluate(host, sample, this.settings(), now)
-    return { host: host.name, hostId: host.id }
+    // Results the agent carried back on this report, then whatever work is due.
+    this.#takePingResults(host.id, body)
+    this.#dispatchPings(host.id)
+    // The response is the only channel back to the agent: pending events ride
+    // it, and the agent acks them on its next report (Komari's POST fallback).
+    const events = takeEvents(host.id, Array.isArray(body?.ackEventIds) ? body.ackEventIds : [], 8)
+    return { host: host.name, hostId: host.id, events }
+  }
+
+  /**
+   * Fold the ping results an agent carried back on this report.
+   *
+   * The agent reports every probe it ran since the previous report as
+   * `pings: [{ taskId, ms }]`, where `ms: null` means the probe timed out. All
+   * of them are stored so a latency chart sees every gap, not just the drops.
+   * @param {string} hostId - reporting host.
+   * @param {object} body - the raw report body.
+   */
+  #takePingResults(hostId, body) {
+    const rows = Array.isArray(body?.pings) ? body.pings : []
+    for (const row of rows.slice(0, 32)) {
+      const taskId = typeof row?.taskId === 'string' ? row.taskId : ''
+      if (taskId === '') continue
+      if (!this.pingTasks.some(task => task.id === taskId)) continue
+      const ms = typeof row?.ms === 'number' && Number.isFinite(row.ms) && row.ms >= 0 ? row.ms : null
+      this.pingStore.record(taskId, hostId, ms)
+    }
+  }
+
+  /**
+   * Queue an `agent.ping` event for every task this host is due to run.
+   * @param {string} hostId - reporting host.
+   */
+  #dispatchPings(hostId) {
+    dispatchDue(this.pingStore, this.pingTasks, [hostId], (target, params) => {
+      enqueueEvent(target, 'agent.ping', params)
+    })
+  }
+
+  /**
+   * Ask one host's agent to replace itself with the panel's version.
+   *
+   * The panel cannot push code: the agent dials out only. So this queues an
+   * `agent.switchVersion` event, which rides the next report response (the same
+   * path Komari uses when no websocket is open). The agent then downloads the
+   * script this panel serves, verifies its version, and re-execs.
+   * @param {string} id - host id.
+   * @returns {{queued: boolean, eventId?: string, agentVersion?: string}}
+   */
+  upgradeAgent(id) {
+    const host = this.store.find(id)
+    if (host === undefined) throw new ProbeError('host not found', 404)
+    const event = enqueueEvent(id, 'agent.switchVersion', {
+      version: this.agentVersion,
+      // Paths are relative on purpose: the agent already knows the base URL it
+      // reports to, and a relative path keeps the event portable.
+      shell: '/auth/dsh-probe/agent.sh',
+      node: '/auth/dsh-probe/agent.mjs',
+    })
+    return {
+      queued: true,
+      eventId: event.id,
+      agentVersion: this.agentVersion,
+      currentVersion: host.current?.agentVersion ?? '',
+    }
+  }
+
+  /** Every latency task, each with a per-host summary. */
+  pingSnapshot() {
+    return this.pingTasks.map(task => ({
+      ...task,
+      results: task.hosts.map(hostId => {
+        const host = this.store.find(hostId)
+        return {
+          hostId,
+          hostName: host?.name ?? hostId,
+          ...this.pingStore.summary(task.id, hostId),
+        }
+      }),
+    }))
+  }
+
+  /** Create a latency task. */
+  createPingTask(input) {
+    const task = normalizeTask(input, null)
+    if (task.target === '') throw new ProbeError('ping target is required', 400)
+    this.pingTasks.push(task)
+    this.store.savePingTasks(this.pingTasks)
+    return task
+  }
+
+  /** Patch one latency task. */
+  updatePingTask(id, patch) {
+    const index = this.pingTasks.findIndex(task => task.id === id)
+    if (index === -1) throw new ProbeError('ping task not found', 404)
+    const next = normalizeTask(patch, this.pingTasks[index])
+    if (next.target === '') throw new ProbeError('ping target is required', 400)
+    this.pingTasks[index] = next
+    this.store.savePingTasks(this.pingTasks)
+    return next
+  }
+
+  /** Remove one latency task and its samples. */
+  removePingTask(id) {
+    const index = this.pingTasks.findIndex(task => task.id === id)
+    if (index === -1) throw new ProbeError('ping task not found', 404)
+    this.pingTasks.splice(index, 1)
+    this.pingStore.dropTask(id)
+    this.store.savePingTasks(this.pingTasks)
+    return true
+  }
+
+  /**
+   * Histories for one task/host pair, for the latency chart.
+   * @param {string} taskId
+   * @param {string} hostId
+   * @param {number} [windowMs]
+   */
+  pingSeries(taskId, hostId, windowMs = 60 * 60 * 1000) {
+    const cutoff = Date.now() - windowMs
+    return this.pingStore.samples(taskId, hostId).filter(row => row.t >= cutoff)
+  }
+
+  /**
+   * Resolve and persist the host's region from its report source address.
+   *
+   * Runs off the report path (no await), so a slow or failing geolocation
+   * service never delays ingest. The lookup is cached per address, and the
+   * outcome is stored on the host so the panel can draw a flag without any
+   * per-render network call. Private addresses (LAN, loopback) are skipped.
+   * @param host - the host the report belongs to.
+   * @param address - the source address the report arrived from.
+   */
+  #locateHost(host, address) {
+    if (!isPublicAddress(address)) return
+    // The provider resolves once per process; until it is ready the report is
+    // simply stored without a region and the next one picks it up.
+    const provider = this.geoProvider
+    if (provider === undefined) return
+    const cached = cachedRegion(provider.name, address)
+    if (cached !== undefined) {
+      if (cached !== null && host.regionCode !== cached.code) this.store.setRegion(host.id, cached)
+      return
+    }
+    if (!markPending(address)) return
+    lookupRegion(provider, address)
+      .then(region => {
+        clearPending(address)
+        if (region === null) return
+        this.store.setRegion(host.id, region)
+      })
+      .catch(() => { clearPending(address) })
+  }
+
+  /**
+   * Prepare the region provider (offline database when present, otherwise the
+   * configured remote fallback). Safe to call more than once.
+   * @returns {Promise<{name: string}>} the active provider.
+   */
+  async initGeo() {
+    if (this.geoProvider !== undefined) return this.geoProvider
+    const configured = this.settings().geoProvider ?? ''
+    this.geoProvider = await createProvider(configured, this.metrics.root)
+    return this.geoProvider
+  }
+
+  /** Which region provider is active, and whether the offline database exists. */
+  geoStatus() {
+    return {
+      provider: this.geoProvider?.name ?? 'pending',
+      database: databaseStatus(this.metrics.root),
+    }
+  }
+
+  /**
+   * Download the offline database and switch to it, so lookups stop needing a
+   * network at all.
+   * @returns {Promise<{ok: boolean, error?: string}>}
+   */
+  async downloadGeoDatabase() {
+    const result = await downloadDatabase(this.metrics.root)
+    if (result.ok) {
+      this.geoProvider = undefined
+      await this.initGeo()
+    }
+    return result
   }
 
   /**

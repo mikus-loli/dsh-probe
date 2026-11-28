@@ -19,6 +19,8 @@ import { ProbeApi } from './api'
 import { en, zh, type ProbeKey } from './locales'
 import { setRuntimeTranslate, tt } from './panel/helpers'
 import { ProbePanel } from './panel/ProbePanel'
+import { SettingsPage } from './panel/SettingsPage'
+import { importTheme } from './theme/mikus'
 
 /** Locale namespace this plugin owns. */
 const NS = 'dsh-probe'
@@ -26,8 +28,10 @@ const NS = 'dsh-probe'
 /** The panel id shared by the sidebar row and the main-slot occupant. */
 export const PROBE_PANEL_ID = 'probe'
 
+
 /** Row order among the shell's global panel rows (Plugins 0, Schedule 10, SSH 40). */
 const PANEL_ORDER = 45
+
 
 /** Required client services. */
 export const inject = ['slots', 'locale']
@@ -71,6 +75,9 @@ function ProbePage({ api }: { api: ProbeApi }): React.ReactElement {
  * @param ctx - client root context (slots + locale).
  */
 export function apply(ctx: ClientContext): void {
+  // The theme is a stylesheet from the Komari Mikus repository; installing it
+  // here means every surface below can use the upstream class names directly.
+  try { importTheme() } catch { /* a missing theme must not block the panel */ }
   ctx.effect(() => {
     try {
       return ctx.locale.register(NS, { zh, en })
@@ -102,6 +109,8 @@ export function apply(ctx: ClientContext): void {
       key: PROBE_PANEL_ID,
       inject: () => ({ api }),
     }, ProbePage as never)))
+
+
   } catch (error) {
     // Registration failures degrade the panel, never the GUI.
     console.warn('[dsh-probe] panel registration failed:', error)

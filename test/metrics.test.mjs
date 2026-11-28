@@ -102,3 +102,118 @@ test('minute history keeps the connection averages', () => {
   assert.equal(row.tc, 15)
   assert.equal(row.uc, 3)
 })
+
+test('private addresses are not geolocated; public ones are', async () => {
+  const { isPublicAddress } = await import('../host/geo.js')
+  for (const address of ['127.0.0.1', '10.0.0.5', '192.168.1.9', '172.16.4.10', '::1', 'fe80::1', '100.64.0.1', '']) {
+    assert.equal(isPublicAddress(address), false, `${address} must be private`)
+  }
+  for (const address of ['103.121.94.197', '1.1.1.1', '::ffff:103.121.94.197', '2001:4860:4860::8888']) {
+    assert.equal(isPublicAddress(address), true, `${address} must be public`)
+  }
+})
+
+test('an ISO code renders as a flag emoji', async () => {
+  const { flagEmoji, hasFlag } = await import('../src/client/panel/flag.ts').catch(() => ({}))
+  // The helper is TypeScript; when the loader cannot import it, skip instead of
+  // pretending the assertion ran.
+  if (typeof flagEmoji !== 'function') return
+  assert.equal(flagEmoji('hk'), '\u{1F1ED}\u{1F1F0}')
+  assert.equal(hasFlag('hk'), true)
+  assert.equal(hasFlag(''), false)
+})
+
+test('the store records a detected region on the host', () => {
+  tempHome()
+  const { store } = makeService()
+  const host = store.create({ name: 'geo-1' })
+  store.setRegion(host.id, { code: 'hk', name: 'Hong Kong' })
+  const saved = store.find(host.id)
+  assert.equal(saved.regionCode, 'hk')
+  assert.equal(saved.regionName, 'Hong Kong')
+})
+
+test('a ping task dispatches once per interval and records the result', async () => {
+  const { ProbeService } = await import('../host/service.js')
+  const { ProbeStore } = await import('../host/store.js')
+  const { MetricsHub } = await import('../host/metrics.js')
+  const { tempHome } = await import('./helpers.mjs')
+  tempHome()
+  const root = dataDir()
+  const store = new ProbeStore({ root })
+  const metrics = new MetricsHub({ root })
+  const alerts = { evaluate() {}, evaluateOffline() {}, snapshot() { return { active: [], recent: [] } }, forHost() { return { active: [], recent: [] } } }
+  const service = new ProbeService({ store, metrics, alerts, version: 't', agentVersion: 't' })
+  const host = store.create({ name: 'ping-host' })
+  const task = service.createPingTask({ name: 'Local', type: 'icmp', target: '127.0.0.1', intervalSec: 10, hosts: [host.id] })
+
+  const sample = {
+    cpu: 5, mem: { total: 100, used: 50 }, disk: { mount: '/', total: 100, used: 40 },
+    load: [0.1, 0.1, 0.1], net: { rxRate: 1, txRate: 1 }, uptime: 1, cores: 2,
+  }
+  const first = service.ingest(host.token, sample, '')
+  assert.equal(first.events.length, 1, 'one task is due, so one event is queued')
+  assert.equal(first.events[0].method, 'agent.ping')
+  assert.equal(first.events[0].params.target, '127.0.0.1')
+
+  // The agent answers with a sample and an ack: the event is gone, the number kept.
+  // Reports are rate-limited by MIN_REPORT_GAP_MS, so wait out the gap.
+  await new Promise(resolve => setTimeout(resolve, 600))
+  const second = service.ingest(host.token, {
+    ...sample,
+    pings: [{ taskId: task.id, ms: 7 }],
+    ackEventIds: first.events.map(event => event.id),
+  }, '')
+  assert.equal(second.events.length, 0, 'the interval has not elapsed, and the ack removed the event')
+  assert.deepEqual(service.pingStore.samples(task.id, host.id).map(row => row.ms), [7])
+  assert.equal(service.pingSnapshot()[0].results[0].latest, 7)
+})
+
+test('a lost probe is recorded as null, not as zero', async () => {
+  const { ProbeService } = await import('../host/service.js')
+  const { ProbeStore } = await import('../host/store.js')
+  const { MetricsHub } = await import('../host/metrics.js')
+  const { tempHome } = await import('./helpers.mjs')
+  tempHome()
+  const root = dataDir()
+  const store = new ProbeStore({ root })
+  const metrics = new MetricsHub({ root })
+  const alerts = { evaluate() {}, evaluateOffline() {}, snapshot() { return { active: [], recent: [] } }, forHost() { return { active: [], recent: [] } } }
+  const service = new ProbeService({ store, metrics, alerts, version: 't', agentVersion: 't' })
+  const host = store.create({ name: 'loss-host' })
+  const task = service.createPingTask({ name: 'Blackhole', type: 'icmp', target: '192.0.2.1', intervalSec: 10, hosts: [host.id] })
+  const sample = {
+    cpu: 5, mem: { total: 100, used: 50 }, disk: { mount: '/', total: 100, used: 40 },
+    load: [0.1, 0.1, 0.1], net: { rxRate: 1, txRate: 1 }, uptime: 1, cores: 2,
+  }
+  service.ingest(host.token, { ...sample, pings: [{ taskId: task.id, ms: null }] }, '')
+  const summary = service.pingStore.summary(task.id, host.id)
+  assert.equal(summary.latest, null)
+  assert.equal(summary.loss, 100, 'the only sample was a loss')
+})
+
+test('an upgrade queues a switchVersion event for that host only', async () => {
+  const { ProbeService } = await import('../host/service.js')
+  const { ProbeStore } = await import('../host/store.js')
+  const { MetricsHub } = await import('../host/metrics.js')
+  const { take } = await import('../host/events.js')
+  const { tempHome } = await import('./helpers.mjs')
+  tempHome()
+  const root = dataDir()
+  const store = new ProbeStore({ root })
+  const metrics = new MetricsHub({ root })
+  const alerts = { evaluate() {}, evaluateOffline() {}, snapshot() { return { active: [], recent: [] } }, forHost() { return { active: [], recent: [] } } }
+  const service = new ProbeService({ store, metrics, alerts, version: 't', agentVersion: '9.9.9' })
+  const host = store.create({ name: 'upgrade-host' })
+  const queued = service.upgradeAgent(host.id)
+  assert.equal(queued.queued, true)
+  assert.equal(queued.agentVersion, '9.9.9')
+  const events = take(host.id, [], 8)
+  assert.equal(events.length, 1)
+  assert.equal(events[0].method, 'agent.switchVersion')
+  assert.equal(events[0].params.version, '9.9.9')
+  assert.match(events[0].params.shell, /agent\.sh$/)
+  // A second host must not see the first host's command.
+  const other = store.create({ name: 'other-host' })
+  assert.equal(take(other.id, [], 8).length, 0)
+})

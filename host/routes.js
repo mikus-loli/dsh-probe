@@ -18,6 +18,7 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { connectionAdmits } from './connection-trust.js'
 import { readJsonBody, writeJson } from './http.js'
 import { isLoopbackRequest } from './loopback.js'
@@ -30,6 +31,8 @@ export const PROBE_PATHS = {
   ingest: '/auth/dsh-probe/ingest',
   agent: '/auth/dsh-probe/agent.mjs',
   shellAgent: '/auth/dsh-probe/agent.sh',
+  /** Country flags, one SVG per ISO 3166-1 alpha-2 code. */
+  flags: '/auth/dsh-probe/flags',
   version: '/auth/dsh-probe/version.json',
 }
 
@@ -92,6 +95,71 @@ async function dispatch(req, res, service, method, rest, url) {
     if (segments[1] === 'clear' && segments.length === 2) {
       if (method !== 'POST') throw new ProbeError('method not allowed', 405)
       writeJson(res, 200, service.clearRecentAlerts())
+      return
+    }
+  }
+
+  // /hosts/<id>/upgrade — queue an agent self-replacement
+  if (segments[0] === 'hosts' && segments[2] === 'upgrade' && segments.length === 3) {
+    if (method !== 'POST') throw new ProbeError('method not allowed', 405)
+    writeJson(res, 202, service.upgradeAgent(segments[1]))
+    return
+  }
+
+  // /pings — latency tasks and their samples
+  if (segments[0] === 'pings') {
+    if (segments.length === 1) {
+      if (method === 'GET') {
+        writeJson(res, 200, { tasks: service.pingSnapshot() })
+        return
+      }
+      if (method === 'POST') {
+        const body = await readJsonBody(req)
+        if (body === null) throw new ProbeError('invalid JSON body')
+        writeJson(res, 201, { task: service.createPingTask(body) })
+        return
+      }
+      throw new ProbeError('method not allowed', 405)
+    }
+    if (segments.length === 2) {
+      const id = segments[1]
+      if (method === 'PATCH' || method === 'POST') {
+        const body = await readJsonBody(req)
+        if (body === null) throw new ProbeError('invalid JSON body')
+        writeJson(res, 200, { task: service.updatePingTask(id, body) })
+        return
+      }
+      if (method === 'DELETE') {
+        service.removePingTask(id)
+        writeJson(res, 200, { ok: true })
+        return
+      }
+      throw new ProbeError('method not allowed', 405)
+    }
+    // /pings/<taskId>/<hostId>?window=3600000 — the chart series
+    if (segments.length === 3 && method === 'GET') {
+      const windowMs = Number(url.searchParams.get('window') ?? 3600000)
+      writeJson(res, 200, {
+        series: service.pingSeries(
+          segments[1],
+          segments[2],
+          Number.isFinite(windowMs) && windowMs > 0 ? windowMs : 3600000,
+        ),
+      })
+      return
+    }
+    throw new ProbeError('not found', 404)
+  }
+
+  // /geo — status, and download of the offline database
+  if (segments[0] === 'geo') {
+    if (segments.length === 1 && method === 'GET') {
+      writeJson(res, 200, service.geoStatus())
+      return
+    }
+    if (segments[1] === 'download' && segments.length === 2) {
+      if (method !== 'POST') throw new ProbeError('method not allowed', 405)
+      writeJson(res, 200, await service.downloadGeoDatabase())
       return
     }
   }
@@ -208,8 +276,18 @@ function ingestRoute(service) {
         return
       }
       try {
-        const result = service.ingest(token, body)
-        writeJson(res, 200, { ok: true, host: result.host })
+        // Prefer the address the agent reports for itself: one that reports to
+        // 127.0.0.1 (or through a LAN proxy) has a loopback source, which
+        // carries no geography. The connection address stays as the fallback for
+        // agents that do not send one.
+        const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()
+        const reported = typeof body?.ip === 'string' ? body.ip : ''
+        const sourceAddress = reported !== '' ? reported : (forwarded || req.socket?.remoteAddress || '')
+        const result = service.ingest(token, body, sourceAddress)
+        // The response is the downstream channel: queued agent commands ride
+        // back on it (Komari's POST fallback), so a probe can be told to run a
+        // latency check without any inbound connection.
+        writeJson(res, 200, { ok: true, host: result.host, events: result.events ?? [] })
       } catch (error) {
         if (error instanceof ProbeError) {
           writeJson(res, error.status, { error: error.message })
@@ -240,6 +318,53 @@ function versionRoute() {
           { kind: 'node', path: PROBE_PATHS.agent, version: AGENT_VERSION },
         ],
       })
+    },
+  }
+}
+
+/**
+ * Serve one country flag, ported from the Mikus theme's `assets/flags/*.svg`.
+ *
+ * The flag is a real image rather than an emoji: an emoji renders as its two
+ * letters whenever the host has no emoji font, which is exactly how "🇭🇰" ends
+ * up displayed as "HK". Serving the SVG the upstream theme ships keeps the crest
+ * a flag everywhere. Only two-letter codes are addressable, so the parameter
+ * cannot walk out of the directory.
+ * @param flagDir - absolute path of the packaged flag directory.
+ */
+function flagRoute(flagDir) {
+  const cache = new Map()
+  return {
+    kind: 'prefix',
+    path: PROBE_PATHS.flags,
+    handler: (req, res) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        writeJson(res, 405, { error: 'method not allowed' }, { allow: 'GET, HEAD' })
+        return
+      }
+      const url = new URL(req.url ?? '/', 'http://localhost')
+      const rest = url.pathname.slice(PROBE_PATHS.flags.length)
+      const code = rest.replace(/^\//, '').replace(/\.svg$/i, '').toLowerCase()
+      if (!/^[a-z]{2}$/.test(code)) {
+        writeJson(res, 404, { error: 'unknown flag' })
+        return
+      }
+      let body = cache.get(code)
+      if (body === undefined) {
+        try {
+          body = readFileSync(join(flagDir, `${code}.svg`))
+        } catch {
+          writeJson(res, 404, { error: 'unknown flag' })
+          return
+        }
+        cache.set(code, body)
+      }
+      res.writeHead(200, {
+        'content-type': 'image/svg+xml',
+        'cache-control': 'public, max-age=86400',
+        'x-content-type-options': 'nosniff',
+      })
+      res.end(req.method === 'HEAD' ? undefined : body)
     },
   }
 }
@@ -280,6 +405,7 @@ function sourceRoute(path, agentPath, contentType) {
  * @param options.connection - reader for the deployment's connection trust.
  * @param options.agentPath - absolute path of the packaged agent.mjs.
  * @param options.shellAgentPath - absolute path of the packaged agent.sh.
+ * @param options.flagDir - absolute path of the packaged flag directory.
  */
 export function makeRoutes(options) {
   return [
@@ -287,6 +413,7 @@ export function makeRoutes(options) {
     ingestRoute(options.service),
     sourceRoute(PROBE_PATHS.agent, options.agentPath, 'text/javascript; charset=utf-8'),
     sourceRoute(PROBE_PATHS.shellAgent, options.shellAgentPath, 'text/x-shellscript; charset=utf-8'),
+    flagRoute(options.flagDir),
     versionRoute(),
   ]
 }

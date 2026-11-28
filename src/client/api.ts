@@ -51,6 +51,36 @@ export interface ProbeSample {
   agentVersion: string
 }
 
+/** One host's standing on one latency task. */
+export interface ProbePingResult {
+  hostId: string
+  hostName: string
+  latest: number | null
+  avg: number | null
+  loss: number | null
+  count: number
+}
+
+/** A latency probe task. */
+export interface ProbePingTask {
+  id: string
+  name: string
+  type: 'icmp' | 'tcp' | 'http'
+  target: string
+  intervalSec: number
+  hosts: string[]
+  enabled: boolean
+  results: ProbePingResult[]
+  createdAt?: number
+  updatedAt?: number
+}
+
+/** A latency sample: `ms === null` is a loss, not a zero. */
+export interface ProbePingSample {
+  t: number
+  ms: number | null
+}
+
 /** A sparkline series for one host card. */
 export interface ProbeSpark {
   from: number
@@ -88,6 +118,10 @@ export interface ProbeHost {
   token: string
   tags: string[]
   location: string
+  /** ISO 3166-1 alpha-2 detected from the agent's source address, lowercase. */
+  regionCode: string
+  /** Display label for the region, e.g. `Hong Kong`. */
+  regionName: string
   note: string
   enabled: boolean
   createdAt: number
@@ -121,6 +155,8 @@ export interface ProbeSettings {
     offline: { enabled: boolean; holdSec: number }
   }
   retentionDays: number
+  /** Region provider: '' auto, mmdb offline, ip-api/geojs/ipinfo remote, none. */
+  geoProvider: string
   reportIntervalSec: number
   notify: {
     enabled: boolean
@@ -227,6 +263,63 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 /** The probe panel's API client. */
 export class ProbeApi {
   /** Current snapshot: hosts, alerts, settings. */
+  /**
+   * Ask one host's agent to replace itself with this panel's build.
+   *
+   * Queues an `agent.switchVersion` event; the agent picks it up on its next
+   * report, downloads the script, verifies it and re-execs.
+   */
+  async upgradeAgent(id: string): Promise<{ queued: boolean; agentVersion: string; currentVersion: string }> {
+    return request<{ queued: boolean; agentVersion: string; currentVersion: string }>(
+      `/hosts/${encodeURIComponent(id)}/upgrade`,
+      { method: 'POST' },
+    )
+  }
+
+  /** Region provider status and the local database's size and age. */
+  async geoStatus(): Promise<{ provider: string; database: { present: boolean; bytes: number; updatedAt: number } }> {
+    return request<{ provider: string; database: { present: boolean; bytes: number; updatedAt: number } }>('/geo')
+  }
+
+  /** Download the offline GeoIP database and switch to it. */
+  async downloadGeoDatabase(): Promise<{ ok: boolean; error?: string }> {
+    return request<{ ok: boolean; error?: string }>('/geo/download', { method: 'POST' })
+  }
+
+  /** Every latency task with its per-host summary. */
+  async listPingTasks(): Promise<ProbePingTask[]> {
+    const body = await request<{ tasks: ProbePingTask[] }>('/pings')
+    return body.tasks ?? []
+  }
+
+  /** Create a latency task. */
+  async createPingTask(payload: Record<string, unknown>): Promise<ProbePingTask> {
+    const body = await request<{ task: ProbePingTask }>('/pings', { method: 'POST', body: JSON.stringify(payload) })
+    return body.task
+  }
+
+  /** Patch one latency task. */
+  async updatePingTask(id: string, payload: Record<string, unknown>): Promise<ProbePingTask> {
+    const body = await request<{ task: ProbePingTask }>(`/pings/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+    return body.task
+  }
+
+  /** Delete one latency task and its samples. */
+  async deletePingTask(id: string): Promise<void> {
+    await request<{ ok: boolean }>(`/pings/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
+
+  /** Samples for one task/host pair over a window. */
+  async pingSeries(taskId: string, hostId: string, windowMs: number): Promise<ProbePingSample[]> {
+    const body = await request<{ series: ProbePingSample[] }>(
+      `/pings/${encodeURIComponent(taskId)}/${encodeURIComponent(hostId)}?window=${windowMs}`,
+    )
+    return body.series ?? []
+  }
+
   async snapshot(): Promise<ProbeSnapshot> {
     return request<ProbeSnapshot>('/snapshot')
   }
