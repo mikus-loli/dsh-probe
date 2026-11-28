@@ -107,6 +107,49 @@ function themeCssPlugin(scope) {
   }
 }
 
+/**
+ * Replace relative `url(...)` references in the theme with data URIs.
+ *
+ * Only files that exist in the logo directory are rewritten; anything else is
+ * left alone so a missing asset fails loudly in the network panel instead of
+ * silently becoming an empty string.
+ * @param {string} css - scoped stylesheet.
+ * @param {string} logoDir - directory holding the theme's images.
+ * @returns {Promise<string>} the stylesheet with inlined assets.
+ */
+async function inlineThemeUrls(css, logoDir) {
+  const cache = new Map()
+  const matches = [...css.matchAll(/url\((['"]?)([^)'"]+)\1\)/g)]
+  for (const match of matches) {
+    const target = match[2]
+    if (!target.startsWith('../')) continue
+    const name = target.replace(/^\.\.\/logo\//, '')
+    if (name === target) continue
+    const file = resolve(logoDir, name)
+    if (cache.has(file)) continue
+    try {
+      const data = await readFile(file)
+      const ext = name.slice(name.lastIndexOf('.') + 1).toLowerCase()
+      const mime = ext === 'svg' ? 'image/svg+xml'
+        : ext === 'png' ? 'image/png'
+          : ext === 'webp' ? 'image/webp'
+            : ext === 'gif' ? 'image/gif'
+              : 'application/octet-stream'
+      cache.set(file, `data:${mime};base64,${data.toString('base64')}`)
+    } catch {
+      cache.set(file, null)
+    }
+  }
+  let out = css
+  for (const [file, uri] of cache) {
+    if (uri === null) continue
+    const name = file.slice(file.lastIndexOf('/') + 1)
+    out = out.split(`url('../logo/${name}')`).join(`url("${uri}")`)
+    out = out.split(`url("../logo/${name}")`).join(`url("${uri}")`)
+  }
+  return out
+}
+
 /** Theme layers, in the order the upstream page loads them. */
 const THEME_FILES = [
   'base', 'header', 'welcome', 'stats', 'nodes-grid', 'nodes', 'nodes-table',
@@ -136,7 +179,13 @@ function themeBundlePlugin(scope) {
           parts.push(`/* ${name}.css */\n${await readFile(file, 'utf8')}`)
         }
         const scoped = scopeStylesheet(parts.join('\n'), scope)
-        return { contents: `export default ${JSON.stringify(scoped)};`, loader: 'js', resolveDir: dir }
+        // The stylesheets reference their logo files relatively (`../logo/x.svg`).
+        // Injected as a <style> tag there is no base URL, so those resolve
+        // against the document and 404 — every OS icon ends up blank. Inline
+        // them instead: the whole set is under 90 KB and this keeps the theme
+        // free of asset routes.
+        const inlined = await inlineThemeUrls(scoped, resolve(root, 'src/client/theme/logo'))
+        return { contents: `export default ${JSON.stringify(inlined)};`, loader: 'js', resolveDir: dir }
       })
     },
   }
